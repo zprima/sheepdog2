@@ -120,38 +120,84 @@ button.zoom-btn:active { background: rgba(242,193,78,0.22); border-color: var(--
 .menu-hint { padding-left: 44px; font-size: 12px; color: var(--muted); opacity: 0.8; }
 .menu-hint kbd { margin-right: 2px; }
 #overlay.title #help { margin-left: auto; margin-right: auto; }
-/* Field choice */
-#maps.title-screen { gap: 18px; max-width: 680px; }
 .logo.logo-sm { font-size: clamp(40px, 6.5vw, 68px); }
-.menu-item.map-item { display: flex; align-items: baseline; gap: 12px; font-size: clamp(20px, 2.8vw, 26px); padding-top: 3px; padding-bottom: 3px; }
-.mi-loc { font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); text-shadow: none; }
-.menu-item.map-item.selected .mi-loc { color: var(--accent2); }
 .map-back { margin-top: 6px; font-size: clamp(16px, 2.2vw, 20px) !important; }
-.map-info { display: flex; flex-direction: column; gap: 6px; min-height: 8.5em; }
-.map-loc { padding-left: 44px; font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent2); min-height: 1.2em; }
-.map-info .menu-desc { min-height: 0; max-width: 500px; color: var(--text); opacity: 0.85; display: grid; }
-.map-info .menu-desc > span { grid-area: 1 / 1; visibility: hidden; }
-.map-info .menu-desc > span.active { visibility: visible; }
-.map-stats.hidden-keep { visibility: hidden; }
-.map-stats { padding-left: 44px; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.map-stats .stat { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--panel-border); min-width: 84px; }
-.stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.stat-value { font-size: 15px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 @media (max-height: 560px) { .title-screen { gap: 14px; } .menu-desc { min-height: 0; } }
-@media (max-height: 760px) { #maps .title-block { display: none; } .map-info { min-height: 0; } }
-/* Wide screens: the field details sit in a panel beside the list rather than below it. */
-@media (min-width: 900px) and (pointer: fine) {
-  #maps.title-screen {
-    display: grid; grid-template-columns: auto minmax(280px, 380px); align-content: center; align-items: center;
-    column-gap: 36px; row-gap: 18px; max-width: 1100px;
-  }
-  #maps .title-block, #maps .menu-hint { grid-column: 1 / -1; }
-  #maps .map-info {
-    min-height: 0; padding: 16px 18px; border-radius: 12px;
-    background: rgba(8, 14, 6, 0.6); border: 1px solid var(--panel-border);
-  }
-  #maps .map-loc, #maps .map-info .menu-desc, #maps .map-stats { padding-left: 0; }
+
+/* Field choice: the live field fills the screen, its details sit top-left and the fields are a strip of cards along the bottom. */
+#overlay.title.fields {
+  background:
+    linear-gradient(180deg, rgba(8, 14, 6, 0.72) 0%, rgba(8, 14, 6, 0.2) 34%, transparent 55%, rgba(8, 14, 6, 0.55) 78%, rgba(8, 14, 6, 0.8) 100%),
+    linear-gradient(90deg, rgba(8, 14, 6, 0.5) 0%, transparent 45%);
 }
+#maps.field-select {
+  max-width: none; width: 100%; justify-content: space-between; gap: 16px;
+  padding: 36px clamp(16px, 6vw, 96px) 24px;
+}
+.fs-info { max-width: 560px; }
+.fs-info.desc-in { animation: desc-in 0.25s ease-out; }
+.fs-info .eyebrow { margin-bottom: 6px; }
+.fs-name {
+  margin: 0 0 6px; font-family: "Lilita One", "Avenir Next", system-ui, sans-serif; font-weight: 400;
+  font-size: clamp(38px, 5.5vw, 66px); line-height: 1; letter-spacing: 0.01em; color: #fff6dc;
+  text-shadow: 0 3px 0 #6b4a12, 0 6px 0 rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.5);
+}
+.map-loc { font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent2); min-height: 1.2em; }
+.fs-desc {
+  margin: 10px 0 0; max-width: 540px; font-size: 15px; line-height: 1.5; color: var(--text); opacity: 0.88; text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
+}
+.map-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.map-stats .stat { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: 8px; background: rgba(8, 14, 6, 0.6); border: 1px solid var(--panel-border); min-width: 84px; }
+.stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.stat-value { font-size: 15px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.fs-bottom { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fs-strip {
+  display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; scroll-snap-type: x proximity;
+  margin: 0 calc(-1 * clamp(16px, 6vw, 96px)); padding: 14px clamp(16px, 6vw, 96px) 6px;
+}
+.fs-strip::-webkit-scrollbar { display: none; }
+.fs-card {
+  flex: 0 0 auto; width: 124px; display: flex; flex-direction: column; gap: 3px; padding: 6px 6px 8px; scroll-snap-align: center;
+  background: rgba(8, 14, 6, 0.62); border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 12px;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: transform 0.18s ease-out, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+.fs-card:hover { border-color: rgba(255, 255, 255, 0.3); }
+.fs-thumb { display: block; width: 100%; aspect-ratio: 5 / 6; border-radius: 7px; background: #2b4a22; margin-bottom: 3px; }
+.fs-card-loc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Names get two lines, and every card keeps room for two so the strip stays level. */
+.fs-card-name {
+  font-family: "Lilita One", "Avenir Next", system-ui, sans-serif; font-size: 15px; line-height: 1.15; letter-spacing: 0.02em;
+  min-height: 2.3em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.fs-card-loc { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.fs-card:not(.selected) .fs-thumb { filter: saturate(0.65) brightness(0.8); }
+.fs-card.selected {
+  transform: translateY(-8px); border-color: var(--accent); background: rgba(22, 32, 16, 0.9);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45), 0 0 0 4px rgba(242, 193, 78, 0.2);
+}
+.fs-card.selected .fs-card-name { color: var(--accent); }
+.fs-card.selected .fs-card-loc { color: var(--accent2); }
+.fs-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.fs-bar { display: flex; align-items: center; gap: 18px; }
+.fs-bar .menu-hint { padding-left: 0; }
+.fs-back {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border-radius: 10px; cursor: pointer;
+  background: rgba(8, 14, 6, 0.6); border: 1px solid var(--panel-border); color: var(--text);
+  font-family: "Lilita One", "Avenir Next", system-ui, sans-serif; font-size: 17px; letter-spacing: 0.02em;
+}
+.fs-back:hover { border-color: rgba(255, 255, 255, 0.35); }
+.fs-back kbd { font-family: "Avenir Next", system-ui, sans-serif; font-size: 11px; }
+.map-start {
+  margin-left: auto; padding: 11px 28px; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--accent); color: #1b1b12; font-family: "Lilita One", "Avenir Next", system-ui, sans-serif; font-size: 20px; letter-spacing: 0.02em;
+  box-shadow: 0 3px 0 #6b4a12; transition: filter 0.15s;
+}
+.map-start:hover { filter: brightness(1.08); }
+.map-start:active { transform: translateY(2px); box-shadow: 0 1px 0 #6b4a12; }
 
 /* Options */
 #options .menu-group { margin-top: 0; }
@@ -245,21 +291,31 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .menu-item { font-size: 24px; padding-left: 36px; }
   .menu-item::before { left: 10px; }
   .menu-item.selected { transform: translateX(4px); }
-  .menu-group, .menu-desc, .map-loc, .map-stats { padding-left: 36px; }
+  .menu-group, .menu-desc { padding-left: 36px; }
   .menu-sep { margin-left: 36px; }
   #menu .menu-desc, #options .menu-desc { margin-top: 0; }
   .menu-item.util { font-size: 18px; }
   .menu-item.util::before { left: 13px; }
   .menu-item { max-width: 100%; text-align: left; }
   .eyebrow { font-size: 11px; letter-spacing: 0.16em; }
-  .menu-item.map-item { flex-wrap: wrap; column-gap: 10px; row-gap: 0; }
-  .map-start {
-    margin-top: 10px; width: 100%; padding: 13px 16px; border: none; border-radius: 10px; cursor: pointer;
-    background: var(--accent); color: #1b1b12; font-family: "Lilita One", "Avenir Next", system-ui, sans-serif; font-size: 20px; letter-spacing: 0.02em;
-    box-shadow: 0 3px 0 #6b4a12;
+  /* Field choice fits one screen: details on top, cards and buttons at the bottom. */
+  #maps.field-select {
+    overflow: hidden; justify-content: space-between; gap: 10px;
+    padding: calc(18px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
   }
-  .map-start:active { transform: translateY(2px); box-shadow: 0 1px 0 #6b4a12; }
-  .map-stats .stat { min-width: 0; padding: 4px 8px; }
+  .fs-name { font-size: clamp(30px, 9vw, 44px); }
+  .fs-desc { font-size: 13px; line-height: 1.45; margin-top: 6px; -webkit-line-clamp: 3; line-clamp: 3; }
+  .map-stats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; margin: 10px -16px 0; padding: 0 16px; gap: 6px; }
+  .map-stats::-webkit-scrollbar { display: none; }
+  .map-stats .stat { flex-shrink: 0; min-width: 0; padding: 4px 8px; }
+  .stat-value { font-size: 14px; }
+  .fs-strip { gap: 10px; margin: 0 -16px; padding: 12px 16px 4px; }
+  .fs-card { width: 96px; padding: 5px 5px 7px; }
+  .fs-card-name { font-size: 13px; }
+  .fs-bar { gap: 10px; }
+  .fs-back { padding: 12px 16px; font-size: 18px; }
+  .fs-back kbd { display: none; }
+  .map-start { flex: 1; padding: 13px 16px; }
   .opt-row input[type=range] { width: clamp(110px, 35vw, 200px); }
   .opt-row input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; }
   .menu-item.opt-row { gap: 12px; }
@@ -270,29 +326,8 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .btn-row button { padding: 12px 16px; flex: 1 1 auto; }
 }
 
-/* Phone upright: the field list scrolls and the chosen field's details sit in a sheet pinned to the bottom. */
+/* Phone upright. */
 @media (max-width: 720px) and (orientation: portrait) {
-  #maps.title-screen { overflow: hidden; gap: 10px; padding-bottom: 0; }
-  #maps .title-block { display: block; }
-  #maps .eyebrow { margin-bottom: 4px; }
-  #maps .logo.logo-sm { flex-direction: row; gap: 0.3em; font-size: 30px; }
-  #maps .logo.logo-sm span:last-child { padding-left: 0; }
-  #map-list { flex: 1 1 auto; flex-shrink: 1; min-height: 0; overflow-y: auto; flex-wrap: nowrap; padding-bottom: 8px; }
-  #map-list .menu-item.map-item { font-size: 21px; padding-top: 4px; padding-bottom: 4px; flex-shrink: 0; }
-  #map-list .mi-loc { font-size: 10px; letter-spacing: 0.12em; }
-  #maps .map-info {
-    min-height: 0; gap: 4px; margin: 0 -16px 0 calc(-8px - env(safe-area-inset-left));
-    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-    background: rgba(12, 20, 10, 0.92); border-top: 1px solid var(--panel-border); border-radius: 16px 16px 0 0;
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
-  }
-  #maps .map-loc, #maps .map-info .menu-desc, #maps .map-stats { padding-left: 0; }
-  #maps .map-info .menu-desc { font-size: 13px; line-height: 1.45; }
-  #maps .map-info .menu-desc > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
-  #maps .map-stats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 4px -16px 0; padding: 0 16px; touch-action: pan-x; }
-  #maps .map-stats::-webkit-scrollbar { display: none; }
-  #maps .map-stats .stat { flex-shrink: 0; }
-  .stat-value { font-size: 14px; white-space: nowrap; }
   #menu .menu-desc { min-height: 4.5em; }
 }
 
@@ -311,4 +346,14 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .menu-item.drill { font-size: 18px; }
   .menu-item.util { font-size: 16px; }
   .menu-sep { margin-top: 6px; margin-bottom: 2px; }
+  #maps.field-select { gap: 6px; padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .fs-info .eyebrow { display: none; }
+  .fs-name { font-size: 28px; margin-bottom: 2px; }
+  .fs-desc { -webkit-line-clamp: 2; line-clamp: 2; max-width: 560px; }
+  .map-stats { margin-top: 6px; }
+  .fs-strip { padding-top: 10px; }
+  .fs-card { width: 84px; }
+  .fs-thumb { aspect-ratio: 4 / 3; }
+  .fs-back, .map-start { padding-top: 8px; padding-bottom: 8px; }
+  .map-start { flex: 0 1 auto; padding-left: 32px; padding-right: 32px; }
 }

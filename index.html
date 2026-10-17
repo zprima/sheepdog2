@@ -70,19 +70,22 @@
     <div class="menu-hint"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>Enter</kbd> confirm</div>
   </div>
 
-  <div id="maps" class="title-screen hidden">
-    <div class="title-block">
+  <div id="maps" class="title-screen field-select hidden">
+    <div class="fs-info" id="fs-info">
       <div class="eyebrow" id="maps-mode"></div>
-      <h2 class="logo logo-sm"><span>Choose</span><span>a field</span></h2>
-    </div>
-    <nav class="menu-list" id="map-list"></nav>
-    <div class="map-info">
+      <h2 class="fs-name" id="map-name"></h2>
       <div class="map-loc" id="map-loc"></div>
-      <p id="map-desc" class="menu-desc"></p>
+      <p class="fs-desc" id="map-desc"></p>
       <div class="map-stats" id="map-stats"></div>
-      <button id="map-start" class="map-start touch-only">Start</button>
     </div>
-    <div class="menu-hint"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>Enter</kbd> start &nbsp; <kbd>Esc</kbd> back</div>
+    <div class="fs-bottom">
+      <nav class="fs-strip" id="map-list" aria-label="Fields"></nav>
+      <div class="fs-bar">
+        <button class="fs-back" id="map-back"><kbd>Esc</kbd><span>Back</span></button>
+        <div class="menu-hint"><kbd>&larr;</kbd><kbd>&rarr;</kbd> choose &nbsp; <kbd>Enter</kbd> start</div>
+        <button id="map-start" class="map-start">Start</button>
+      </div>
+    </div>
   </div>
 
   <div id="options" class="title-screen hidden">

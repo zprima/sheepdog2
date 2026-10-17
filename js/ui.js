@@ -11,24 +11,19 @@ class UI {
     this.toastT = 0;
     this.pendingMode = null;
 
-    // One button per field, then Back.
+    // One card per field along the bottom strip, each with a plan of the field drawn once its ground is baked.
     const list = this.$('map-list');
     for (const m of MAPS) {
       const b = document.createElement('button');
-      b.className = 'menu-item map-item'; b.dataset.map = m.id;
-      b.innerHTML = `<span class="mi-name"></span><span class="mi-loc"></span>`;
-      b.querySelector('.mi-name').textContent = m.name;
-      b.querySelector('.mi-loc').textContent = m.location;
+      b.className = 'fs-card'; b.dataset.map = m.id;
+      b.innerHTML = '<canvas class="fs-thumb"></canvas><span class="fs-card-name"></span><span class="fs-card-loc"></span>';
+      b.querySelector('.fs-card-name').textContent = m.name;
+      b.querySelector('.fs-card-loc').textContent = m.location;
       list.appendChild(b);
+      // Queued behind the startup bake (prebakeGrounds), which does the current field first.
+      const canvas = b.querySelector('canvas');
+      setTimeout(() => slicer.add(new Ground(m).bakeSliced(), () => this.drawThumb(canvas, m)));
     }
-    const back = document.createElement('button');
-    back.className = 'menu-item map-item map-back'; back.dataset.action = 'back'; back.textContent = 'Back';
-    list.appendChild(back);
-    // Every blurb sits stacked in one grid cell so the box is always as tall as the longest.
-    this.$('map-desc').replaceChildren(...[...MAPS.map((m) => [m.id, m.sheep ? `${m.blurb} Sheep: ${m.sheep.breed}, ${m.sheep.note}.` : m.blurb]), ['back', 'Back to the mode menu.']].map(([id, text]) => {
-      const s = document.createElement('span'); s.dataset.map = id; s.textContent = text;
-      return s;
-    }));
 
     // Keyboard/mouse-navigable lists on the title screens.
     this.lists = {
@@ -45,19 +40,20 @@ class UI {
       range.addEventListener('input', () => this.setVolume(row, +range.value));
       range.addEventListener('change', () => range.blur());
     }
-    // On touch there is no hover, so the first tap on a field only shows it; a second tap starts.
+    // Menus select on hover. Field cards don't (each one swaps the backdrop): clicking a card picks it, and
+    // clicking the picked card again starts.
     for (const [name, L] of Object.entries(this.lists)) L.items.forEach((b, i) => {
-      // Recorded on pointerdown, before the emulated mouseenter of a tap selects the item.
-      let firstTap = false;
-      b.addEventListener('pointerdown', (e) => { firstTap = e.pointerType !== 'mouse' && L.index !== i; });
       b.addEventListener('click', () => {
         b.blur();
-        if (firstTap && name === 'maps' && !b.dataset.action) { firstTap = false; this.selectItem(name, i, true); return; }
+        if (name === 'maps' && L.index !== i) { this.selectItem(name, i, true); return; }
         this.activateItem(name, b);
       });
-      b.addEventListener('mouseenter', () => this.selectItem(name, i, true));
+      if (name !== 'maps') b.addEventListener('mouseenter', () => this.selectItem(name, i, true));
     });
     this.$('map-start').addEventListener('click', (e) => { e.currentTarget.blur(); this.activateItem('maps', this.lists.maps.items[this.lists.maps.index]); });
+    this.$('map-back').addEventListener('click', (e) => { e.currentTarget.blur(); Sound.menuSound('back'); this.showCard('menu'); });
+    // Wheel over the strip scrolls it sideways.
+    list.addEventListener('wheel', (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { list.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
     this.$('btn-help-back').addEventListener('click', () => this.showCard('menu'));
     window.addEventListener('keydown', (e) => this.onMenuKey(e));
     document.querySelectorAll('button.cmd').forEach(b => b.addEventListener('click', () => { game.command(b.dataset.cmd); b.blur(); }));
@@ -117,42 +113,41 @@ class UI {
   }
 
   activateMap(b) {
-    if (b.dataset.action === 'back') { this.showCard('menu'); return; }
     this.game.selectMap(b.dataset.map);
     this.game.startMode(this.pendingMode);
   }
 
-  showMapDesc(id) {
-    for (const s of this.$('map-desc').children) s.classList.toggle('active', s.dataset.map === id);
+  // A field card's plan, fitted to the card and centred.
+  drawThumb(canvas, m) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1), w = 120, h = 144;   // CSS scales it to the card
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext('2d'), s = Math.max(w / m.width, h / m.height) * dpr;
+    ctx.setTransform(s, 0, 0, s, (canvas.width - m.width * s) / 2, (canvas.height - m.height * s) / 2);
+    drawFieldPlan(ctx, buildCourse(m));
   }
 
-  // Highlighting a field shows its details and swaps the backdrop to it.
+  // Picking a field shows its details, swaps the backdrop to it and brings its card to the middle of the strip.
   showMapInfo(b) {
-    if (b.dataset.action === 'back') {
-      this.$('map-loc').textContent = '';
-      this.showMapDesc('back');
-      this.$('map-stats').classList.add('hidden-keep');
-      this.$('map-start').textContent = 'Back to modes';
-      return;
-    }
     const m = mapById(b.dataset.map);
     this.game.selectMap(m.id);
     const outrun = Math.round(Math.hypot(m.sheepStart.x - m.post.x, m.sheepStart.y - m.post.y));
     const t = m.terrain || {};
     let ground = t.relief && t.relief.tilt ? `Rises ${Math.round(t.relief.tilt * m.height)} m` : t.relief ? 'Rolling' : 'Flat';
     if (t.relief && t.relief.tiltX) ground += `, ${Math.round(Math.abs(t.relief.tiltX) * m.width)} m across`;
+    this.$('map-name').textContent = m.name;
     this.$('map-loc').textContent = m.location;
-    this.showMapDesc(m.id);
-    this.$('map-stats').classList.remove('hidden-keep');
-    this.$('map-start').textContent = `Start at ${m.name}`;
+    this.$('map-desc').textContent = m.sheep ? `${m.blurb} Sheep: ${m.sheep.breed}, ${m.sheep.note}.` : m.blurb;
     const stats = [['Field', `${m.width} × ${m.height} m`], ['Outrun', `${outrun} m`], ['Ground', ground], ['Time limit', M.fmtTime(m.timeLimit)], ['Sheep', sheepTemperamentWord(m.sheep)]];
-    const el = this.$('map-stats');
-    el.replaceChildren(...stats.map(([label, value]) => {
+    this.$('map-stats').replaceChildren(...stats.map(([label, value]) => {
       const d = document.createElement('div'); d.className = 'stat';
       d.innerHTML = '<span class="stat-label"></span><span class="stat-value"></span>';
       d.firstChild.textContent = label; d.lastChild.textContent = value;
       return d;
     }));
+    const info = this.$('fs-info');
+    info.classList.remove('desc-in'); void info.offsetWidth; info.classList.add('desc-in');
+    const list = this.$('map-list');
+    list.scrollTo({ left: b.offsetLeft - (list.clientWidth - b.offsetWidth) / 2, behavior: this.snapStrip ? 'auto' : 'smooth' });
   }
 
   // Arrow / Enter navigation on the title screens; Esc backs out of field choice, Options and How to Play.
@@ -160,7 +155,10 @@ class UI {
     if (['help', 'maps', 'options'].includes(this.current) && (e.code === 'Escape' || e.code === 'Backspace')) { e.preventDefault(); Sound.menuSound('back'); this.showCard('menu'); return; }
     const L = this.lists[this.current];
     if (!L) return;
-    if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); this.selectItem(this.current, L.index - 1, true); }
+    const across = this.current === 'maps';
+    if (across && (e.code === 'ArrowLeft' || e.code === 'KeyA')) { e.preventDefault(); this.selectItem('maps', L.index - 1, true); }
+    else if (across && (e.code === 'ArrowRight' || e.code === 'KeyD')) { e.preventDefault(); this.selectItem('maps', L.index + 1, true); }
+    else if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); this.selectItem(this.current, L.index - 1, true); }
     else if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); this.selectItem(this.current, L.index + 1, true); }
     else if (this.current === 'options' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyA' || e.code === 'KeyD')) {
       e.preventDefault();
@@ -176,12 +174,18 @@ class UI {
       this.selectItem('menu', this.lists.menu.index);
       this.$('menu-field').textContent = `Today's field · ${mapById(this.game.mapId).name}`;
     }
-    if (name === 'maps') this.selectItem('maps', Math.max(0, MAPS.findIndex(m => m.id === this.game.mapId)));
     for (const [k, el] of Object.entries(this.cards)) el.classList.toggle('hidden', k !== name);
+    // After the screen is shown, so the strip has a size to centre the card in.
+    if (name === 'maps') {
+      this.snapStrip = true;
+      this.selectItem('maps', Math.max(0, MAPS.findIndex(m => m.id === this.game.mapId)));
+      this.snapStrip = false;
+    }
     const title = ['menu', 'help', 'maps', 'options'].includes(name);
     this.overlay.classList.toggle('hidden', !name);
     this.hud.classList.toggle('hidden', title);
     this.overlay.classList.toggle('title', title);
+    this.overlay.classList.toggle('fields', name === 'maps');
   }
 
   toast(text) {

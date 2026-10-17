@@ -18,33 +18,8 @@ class Minimap {
     if (this.canvas.width !== w * dpr) { this.canvas.width = w * dpr; this.canvas.height = h * dpr; this.canvas.style.width = w + 'px'; this.canvas.style.height = h + 'px'; }
     const ctx = this.ctx;
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
-    const c = game.course, b = c.bounds;
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(c.ground.fieldCanvas(), 0, 0, map.width, map.height);
-    ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 1.5;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
-    for (const t of c.props) {
-      if (t.x < 0 || t.y < 0 || t.x > map.width || t.y > map.height) continue;
-      ctx.fillStyle = PROP_KINDS[t.kind || 'oak'].mini;
-      if (t.kind === 'hayrack') ctx.fillRect(t.x - t.len / 2, t.y - 1, t.len, 2);
-      else { ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.fill(); }
-    }
-
-    // Course lines.
-    if (game.mode !== 'pen') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(c.start.x, c.start.y); ctx.lineTo(c.post.x, c.post.y);
-      ctx.lineTo(c.driveGates[0].x, c.driveGates[0].y); ctx.lineTo(c.driveGates[1].x, c.driveGates[1].y); ctx.lineTo(c.pen.mouth.x, c.pen.mouth.y);
-      ctx.stroke(); ctx.setLineDash([]);
-    }
-    // Gates.
-    ctx.strokeStyle = '#f2e6b8'; ctx.lineWidth = 2;
-    for (const g of [c.fetchGate, ...c.driveGates]) for (const s of g.hurdles) { ctx.beginPath(); ctx.moveTo(s.ax, s.ay); ctx.lineTo(s.bx, s.by); ctx.stroke(); }
-    // Pen.
-    for (const s of [...c.pen.walls, c.pen.gateSeg()]) { ctx.beginPath(); ctx.moveTo(s.ax, s.ay); ctx.lineTo(s.bx, s.by); ctx.stroke(); }
-    // Post.
-    ctx.fillStyle = '#f2c14e'; ctx.beginPath(); ctx.arc(c.post.x, c.post.y, 2, 0, Math.PI * 2); ctx.fill();
+    const c = game.course;
+    drawFieldPlan(ctx, c, game.mode !== 'pen');
 
     // Camera view (a rhombus in top-down space).
     const cam = game.renderer.cam;
@@ -80,4 +55,35 @@ class Minimap {
     ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 15, y - 7, ctx.measureText(label).width + 8, 14);
     ctx.fillStyle = '#f2f4f0'; ctx.fillText(label, x + 19, y);
   }
+}
+
+// The field from above: ground, fence, trees and buildings, the course gates, pen and post, and optionally the
+// course line. Drawn in world units, so the caller sets the transform. Shared by the minimap and the field cards.
+function drawFieldPlan(ctx, c, lines = true) {
+  const map = c.map, b = c.bounds;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(c.ground.fieldCanvas(), 0, 0, map.width, map.height);
+  ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(b.x, b.y, b.w, b.h);
+  for (const t of c.props) {
+    if (t.x < 0 || t.y < 0 || t.x > map.width || t.y > map.height) continue;
+    ctx.fillStyle = PROP_KINDS[t.kind || 'oak'].mini;
+    if (t.kind === 'hayrack') ctx.fillRect(t.x - t.len / 2, t.y - 1, t.len, 2);
+    else { ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.fill(); }
+  }
+  // Course lines.
+  if (lines) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(c.start.x, c.start.y); ctx.lineTo(c.post.x, c.post.y);
+    ctx.lineTo(c.driveGates[0].x, c.driveGates[0].y); ctx.lineTo(c.driveGates[1].x, c.driveGates[1].y); ctx.lineTo(c.pen.mouth.x, c.pen.mouth.y);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Gates.
+  ctx.strokeStyle = '#f2e6b8'; ctx.lineWidth = 2;
+  for (const g of [c.fetchGate, ...c.driveGates]) for (const s of g.hurdles) { ctx.beginPath(); ctx.moveTo(s.ax, s.ay); ctx.lineTo(s.bx, s.by); ctx.stroke(); }
+  // Pen.
+  for (const s of [...c.pen.walls, c.pen.gateSeg()]) { ctx.beginPath(); ctx.moveTo(s.ax, s.ay); ctx.lineTo(s.bx, s.by); ctx.stroke(); }
+  // Post.
+  ctx.fillStyle = '#f2c14e'; ctx.beginPath(); ctx.arc(c.post.x, c.post.y, 2, 0, Math.PI * 2); ctx.fill();
 }

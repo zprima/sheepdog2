@@ -158,7 +158,7 @@ class Game {
     this.dog.heading = Math.atan2(f.y - this.dog.y, f.x - this.dog.x);
     this.dog.steady = true;
     this.attractAI = { phase: 'REST', t: M.rand(3, 5), target: 0 };
-    this.attractFocus = null;
+    this.attractFocus = null; this.attractOff = null;
     this.attractUpdate(0);
   }
 
@@ -212,9 +212,13 @@ class Game {
     const k = Math.min(1, dt * 0.8);
     fc.x += (tx - fc.x) * k; fc.y += (ty - fc.y) * k;
     let ox = cam.w * 0.375, oy = 0;
-    if (cam.w >= 900) ox = (Math.min(680, cam.w * 0.45) + cam.w) / 2 - cam.w / 2;
+    if (this.ui.current === 'maps') { ox = cam.w * (cam.w >= 900 ? 0.18 : 0.08); oy = -cam.h * 0.04; }   // the field is the picture here
+    else if (cam.w >= 900) ox = (Math.min(680, cam.w * 0.45) + cam.w) / 2 - cam.w / 2;
     else if (cam.h > cam.w * 1.3) { ox = cam.w * 0.15; oy = cam.h * 0.32; }
-    const u = (ox + 2 * oy) / (2 * cam.zoom), v = (2 * oy - ox) / (2 * cam.zoom);
+    // Glide to the new framing when the screen changes.
+    const off = this.attractOff || (this.attractOff = { x: ox, y: oy }), ko = Math.min(1, dt * 2.5);
+    off.x += (ox - off.x) * ko; off.y += (oy - off.y) * ko;
+    const u = (off.x + 2 * off.y) / (2 * cam.zoom), v = (2 * off.y - off.x) / (2 * cam.zoom);
     cam.x = fc.x - u + Math.sin(t * 2) * 3;
     cam.y = fc.y - v + Math.sin(t * 1.4 + 1) * 3;
   }
