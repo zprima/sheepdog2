@@ -57,6 +57,7 @@ class UI {
       });
       b.addEventListener('mouseenter', () => this.selectItem(name, i));
     });
+    this.$('map-start').addEventListener('click', (e) => { e.currentTarget.blur(); this.activateMap(this.lists.maps.items[this.lists.maps.index]); });
     this.$('btn-help-back').addEventListener('click', () => this.showCard('menu'));
     window.addEventListener('keydown', (e) => this.onMenuKey(e));
     document.querySelectorAll('button.cmd').forEach(b => b.addEventListener('click', () => { game.command(b.dataset.cmd); b.blur(); }));
@@ -113,6 +114,7 @@ class UI {
       this.$('map-loc').textContent = '';
       this.showMapDesc('back');
       this.$('map-stats').classList.add('hidden-keep');
+      this.$('map-start').textContent = 'Back to modes';
       return;
     }
     const m = mapById(b.dataset.map);
@@ -124,6 +126,7 @@ class UI {
     this.$('map-loc').textContent = m.location;
     this.showMapDesc(m.id);
     this.$('map-stats').classList.remove('hidden-keep');
+    this.$('map-start').textContent = `Start at ${m.name}`;
     const stats = [['Field', `${m.width} × ${m.height} m`], ['Outrun', `${outrun} m`], ['Ground', ground], ['Time limit', M.fmtTime(m.timeLimit)], ['Sheep', sheepTemperamentWord(m.sheep)]];
     const el = this.$('map-stats');
     el.replaceChildren(...stats.map(([label, value]) => {

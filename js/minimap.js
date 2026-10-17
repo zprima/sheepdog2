@@ -5,11 +5,14 @@ class Minimap {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.size = 210;
+    // Phones get a small one tucked beside the zoom buttons.
+    this.small = window.matchMedia('(max-width: 720px), (max-height: 500px)');
   }
   draw(game) {
     const map = game.course && game.course.map;
     if (!map) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.size = this.small.matches ? 96 : 210;
     const scale = this.size / Math.max(map.width, map.height);
     const w = Math.round(map.width * scale), h = Math.round(map.height * scale);
     if (this.canvas.width !== w * dpr) { this.canvas.width = w * dpr; this.canvas.height = h * dpr; this.canvas.style.width = w + 'px'; this.canvas.style.height = h + 'px'; }

@@ -192,7 +192,7 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
 }
 
 @media (pointer: coarse), (max-width: 720px), (max-height: 500px) {
-  .label-full, .menu-hint, #status .hint, #hud-score, .cmd-title, button.cmd kbd, button.cmd small, #minimap, .help ul:not(.touch-only) { display: none; }
+  .label-full, .menu-hint, #status .hint, .cmd-title, button.cmd kbd, button.cmd small, .help ul:not(.touch-only), .btn-row kbd { display: none; }
   .help h3:first-child { display: none; }
   .label-touch { display: inline; }
   .touch-only { display: block; }
@@ -200,14 +200,20 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   /* In-game HUD: a slim status strip, zoom top right, a compact command pad at the bottom. */
   #status {
     top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left));
-    min-width: 0; max-width: calc(100% - 80px); padding: 6px 10px;
+    min-width: 0; max-width: calc(100% - 172px); padding: 6px 10px;
   }
-  #status .mode { font-size: 10px; }
+  #status .mode { font-size: 10px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   #status .time { font-size: 18px; }
   #status .phase { font-size: 14px; margin-top: 0; }
+  /* Only the current section and the running total; the full card is on the result screen. */
+  #hud-score { margin-top: 3px; font-size: 11px; }
+  #hud-score tr:not(.active):not(.total) { display: none; }
+  #hud-score tr.total td { padding-top: 2px; }
   #minimap-wrap {
     top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); bottom: auto; padding: 4px;
+    align-items: flex-start; gap: 4px;
   }
+  #zoom-controls { gap: 4px; }
   button.zoom-btn { width: 38px; height: 38px; }
   #commands {
     left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right));
@@ -232,7 +238,15 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .menu-item::before { left: 10px; }
   .menu-item.selected { transform: translateX(4px); }
   .menu-group, .menu-desc, .map-loc, .map-stats { padding-left: 36px; }
+  .menu-item { max-width: 100%; text-align: left; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.16em; }
   .menu-item.map-item { flex-wrap: wrap; column-gap: 10px; row-gap: 0; }
+  .map-start {
+    margin-top: 10px; width: 100%; padding: 13px 16px; border: none; border-radius: 10px; cursor: pointer;
+    background: var(--accent); color: #1b1b12; font-family: "Lilita One", "Avenir Next", system-ui, sans-serif; font-size: 20px; letter-spacing: 0.02em;
+    box-shadow: 0 3px 0 #6b4a12;
+  }
+  .map-start:active { transform: translateY(2px); box-shadow: 0 1px 0 #6b4a12; }
   .map-stats .stat { min-width: 0; padding: 4px 8px; }
   .opt-row input[type=range] { width: clamp(110px, 35vw, 200px); }
   .opt-row input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; }
@@ -244,12 +258,38 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .btn-row button { padding: 12px 16px; flex: 1 1 auto; }
 }
 
+/* Phone upright: the field list scrolls and the chosen field's details sit in a sheet pinned to the bottom. */
+@media (max-width: 720px) and (orientation: portrait) {
+  #maps.title-screen { overflow: hidden; gap: 10px; padding-bottom: 0; }
+  #maps .title-block { display: block; }
+  #maps .eyebrow { margin-bottom: 4px; }
+  #maps .logo.logo-sm { flex-direction: row; gap: 0.3em; font-size: 30px; }
+  #maps .logo.logo-sm span:last-child { padding-left: 0; }
+  #map-list { flex: 1 1 auto; flex-shrink: 1; min-height: 0; overflow-y: auto; flex-wrap: nowrap; padding-bottom: 8px; }
+  #map-list .menu-item.map-item { font-size: 21px; padding-top: 4px; padding-bottom: 4px; flex-shrink: 0; }
+  #map-list .mi-loc { font-size: 10px; letter-spacing: 0.12em; }
+  #maps .map-info {
+    min-height: 0; gap: 4px; margin: 0 -16px 0 calc(-8px - env(safe-area-inset-left));
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: rgba(12, 20, 10, 0.92); border-top: 1px solid var(--panel-border); border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+  }
+  #maps .map-loc, #maps .map-info .menu-desc, #maps .map-stats { padding-left: 0; }
+  #maps .map-info .menu-desc { font-size: 13px; line-height: 1.45; }
+  #maps .map-info .menu-desc > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  #maps .map-stats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 4px -16px 0; padding: 0 16px; touch-action: pan-x; }
+  #maps .map-stats::-webkit-scrollbar { display: none; }
+  #maps .map-stats .stat { flex-shrink: 0; }
+  .stat-value { font-size: 14px; white-space: nowrap; }
+  #menu .menu-desc { min-height: 4.5em; }
+}
+
 /* Phone on its side: little height, so the commands become a two-column pad on the right. */
 @media (orientation: landscape) and (max-height: 500px) {
   #commands { left: auto; width: 210px; }
   .cmd-grid { grid-template-columns: repeat(2, 1fr); }
   button.cmd { min-height: 40px; }
-  #minimap-wrap { top: auto; bottom: calc(8px + env(safe-area-inset-bottom)); left: calc(8px + env(safe-area-inset-left)); right: auto; }
+  #minimap-wrap { top: auto; bottom: calc(8px + env(safe-area-inset-bottom)); left: calc(8px + env(safe-area-inset-left)); right: auto; align-items: flex-end; }
   #zoom-controls { flex-direction: row; }
   .title-screen { gap: 10px; padding-top: calc(12px + env(safe-area-inset-top)); }
   #menu .title-block .tag, #menu .eyebrow { display: none; }
