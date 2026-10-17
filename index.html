@@ -50,20 +50,21 @@
 <div id="overlay">
   <div id="menu" class="title-screen">
     <div class="title-block">
-      <div class="eyebrow">Outrun · Lift · Fetch · Drive · Pen</div>
+      <div class="eyebrow" id="menu-field"></div>
       <h1 class="logo"><span>Sheepdog</span><span>Trials 2</span></h1>
       <p class="tag">Work your dog, read your sheep, make the pen.</p>
     </div>
     <nav class="menu-list">
       <button class="menu-item mode-btn" data-mode="trial" data-desc="Full course, timed and scored on the National rules. Ten minutes on the clock. No shed.">Trial Competition</button>
-      <button class="menu-item mode-btn" data-mode="free" data-desc="The same course and scorecard with no clock. Take your time and learn the sheep.">Free Trial</button>
+      <button class="menu-item mode-btn" data-mode="free" data-desc="The same course and scorecard with no clock. Take your time and learn the sheep.">Untimed Trial</button>
       <div class="menu-group">Practice drills</div>
       <button class="menu-item mode-btn drill" data-mode="outrun" data-desc="Send the dog from the post and lift the sheep. Scored out of 30, then the sheep are set out again.">Outrun &amp; Lift</button>
       <button class="menu-item mode-btn drill" data-mode="fetch" data-desc="Sheep already lifted, dog lying behind them. Fetch them through the gate to the post, out of 20.">Fetch</button>
       <button class="menu-item mode-btn drill" data-mode="drive" data-desc="Sheep at the post. Drive away, cross drive and bring them to the pen, out of 30.">Drive</button>
       <button class="menu-item mode-btn drill" data-mode="pen" data-desc="Sheep set out near the pen. Practise the pen over and over, against the clock.">Pen</button>
-      <button class="menu-item" data-action="options" data-desc="Music and sound effect volume.">Options</button>
-      <button class="menu-item" data-action="help" data-desc="Commands, controls and how the judge scores your run.">How to Play</button>
+      <div class="menu-sep" aria-hidden="true"></div>
+      <button class="menu-item util" data-action="options" data-desc="Music and sound effect volume.">Options</button>
+      <button class="menu-item util" data-action="help" data-desc="Commands, controls and how the judge scores your run.">How to Play</button>
     </nav>
     <p id="menu-desc" class="menu-desc"></p>
     <div class="menu-hint"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>Enter</kbd> confirm</div>

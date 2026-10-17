@@ -32,9 +32,9 @@ class UI {
 
     // Keyboard/mouse-navigable lists on the title screens.
     this.lists = {
-      menu: { items: [...document.querySelectorAll('#menu .menu-item')], index: 0, select: (b) => { this.$('menu-desc').textContent = b.dataset.desc; }, activate: (b) => this.activateMenu(b) },
+      menu: { items: [...document.querySelectorAll('#menu .menu-item')], index: 0, select: (b) => this.setDesc('menu-desc', b.dataset.desc), activate: (b) => this.activateMenu(b) },
       maps: { items: [...list.children], index: 0, select: (b) => this.showMapInfo(b), activate: (b) => this.activateMap(b) },
-      options: { items: [...document.querySelectorAll('#options .menu-item')], index: 0, select: (b) => { this.$('options-desc').textContent = b.dataset.desc; }, activate: (b) => { if (b.dataset.action === 'back') this.showCard('menu'); } },
+      options: { items: [...document.querySelectorAll('#options .menu-item')], index: 0, select: (b) => this.setDesc('options-desc', b.dataset.desc), activate: (b) => { if (b.dataset.action === 'back') this.showCard('menu'); } },
     };
     // Volume sliders: drag with the mouse or use left/right on the selected row.
     this.previewAt = 0;
@@ -52,12 +52,12 @@ class UI {
       b.addEventListener('pointerdown', (e) => { firstTap = e.pointerType !== 'mouse' && L.index !== i; });
       b.addEventListener('click', () => {
         b.blur();
-        if (firstTap && name === 'maps' && !b.dataset.action) { firstTap = false; this.selectItem(name, i); return; }
-        L.activate(b);
+        if (firstTap && name === 'maps' && !b.dataset.action) { firstTap = false; this.selectItem(name, i, true); return; }
+        this.activateItem(name, b);
       });
-      b.addEventListener('mouseenter', () => this.selectItem(name, i));
+      b.addEventListener('mouseenter', () => this.selectItem(name, i, true));
     });
-    this.$('map-start').addEventListener('click', (e) => { e.currentTarget.blur(); this.activateMap(this.lists.maps.items[this.lists.maps.index]); });
+    this.$('map-start').addEventListener('click', (e) => { e.currentTarget.blur(); this.activateItem('maps', this.lists.maps.items[this.lists.maps.index]); });
     this.$('btn-help-back').addEventListener('click', () => this.showCard('menu'));
     window.addEventListener('keydown', (e) => this.onMenuKey(e));
     document.querySelectorAll('button.cmd').forEach(b => b.addEventListener('click', () => { game.command(b.dataset.cmd); b.blur(); }));
@@ -69,11 +69,29 @@ class UI {
     this.$('btn-menu').addEventListener('click', () => game.toMenu());
   }
 
-  selectItem(listName, i) {
+  // `sound` plays the move tick, for selections the player made rather than ones set when a screen opens.
+  selectItem(listName, i, sound = false) {
     const L = this.lists[listName], n = L.items.length;
+    if (sound && (i + n) % n !== L.index) Sound.menuSound('move');
     L.index = (i + n) % n;
     L.items.forEach((b, j) => b.classList.toggle('selected', j === L.index));
     L.select(L.items[L.index]);
+  }
+
+  activateItem(listName, b) {
+    if (b.dataset.action === 'back') Sound.menuSound('back');
+    else if (listName !== 'options') Sound.menuSound('confirm');
+    this.lists[listName].activate(b);
+  }
+
+  // Swap a screen's description, fading the new text in.
+  setDesc(id, text) {
+    const el = this.$(id);
+    if (el.textContent === text) return;
+    el.textContent = text;
+    el.classList.remove('desc-in');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('desc-in');
   }
 
   setVolume(row, v) {
@@ -139,22 +157,25 @@ class UI {
 
   // Arrow / Enter navigation on the title screens; Esc backs out of field choice, Options and How to Play.
   onMenuKey(e) {
-    if (['help', 'maps', 'options'].includes(this.current) && (e.code === 'Escape' || e.code === 'Backspace')) { e.preventDefault(); this.showCard('menu'); return; }
+    if (['help', 'maps', 'options'].includes(this.current) && (e.code === 'Escape' || e.code === 'Backspace')) { e.preventDefault(); Sound.menuSound('back'); this.showCard('menu'); return; }
     const L = this.lists[this.current];
     if (!L) return;
-    if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); this.selectItem(this.current, L.index - 1); }
-    else if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); this.selectItem(this.current, L.index + 1); }
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); this.selectItem(this.current, L.index - 1, true); }
+    else if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); this.selectItem(this.current, L.index + 1, true); }
     else if (this.current === 'options' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyA' || e.code === 'KeyD')) {
       e.preventDefault();
       const row = L.items[L.index];
       if (row.dataset.setting) this.setVolume(row, Sound.volume[row.dataset.setting] + (e.code === 'ArrowRight' || e.code === 'KeyD' ? 5 : -5));
     }
-    else if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); L.activate(L.items[L.index]); }
+    else if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); this.activateItem(this.current, L.items[L.index]); }
   }
 
   showCard(name) {
     this.current = name;
-    if (name === 'menu') this.selectItem('menu', this.lists.menu.index);
+    if (name === 'menu') {
+      this.selectItem('menu', this.lists.menu.index);
+      this.$('menu-field').textContent = `Today's field · ${mapById(this.game.mapId).name}`;
+    }
     if (name === 'maps') this.selectItem('maps', Math.max(0, MAPS.findIndex(m => m.id === this.game.mapId)));
     for (const [k, el] of Object.entries(this.cards)) el.classList.toggle('hidden', k !== name);
     const title = ['menu', 'help', 'maps', 'options'].includes(name);

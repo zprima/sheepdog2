@@ -23,7 +23,7 @@ const DRILLS = {
   fetch:  { name: 'Fetch training', phases: ['FETCH', 'DONE'], best: 'score' },
   drive:  { name: 'Drive training', phases: ['DRIVE1', 'DRIVE2', 'DRIVE3', 'DONE'], best: 'score' },
 };
-const MODE_NAMES = { trial: 'Trial competition', free: 'Free trial' };
+const MODE_NAMES = { trial: 'Trial competition', free: 'Untimed trial' };
 for (const [k, d] of Object.entries(DRILLS)) MODE_NAMES[k] = d.name;
 
 class Trial {

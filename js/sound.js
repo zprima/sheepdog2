@@ -53,6 +53,25 @@ const Sound = {
     osc.start(t); osc.stop(t + len);
   },
 
+  // Menu feedback on the effects bus: a soft wooden tick for moving the selection, a short rising pip to confirm,
+  // a falling one to go back. Silent until the page has had a click or key press, since audio can't start before.
+  menuSound(kind) {
+    if (!this.ctx && !(navigator.userActivation && navigator.userActivation.hasBeenActive)) return;
+    const out = this.bus('sfx');
+    if (!out) return;
+    const ctx = this.ctx, t = ctx.currentTime + 0.005;
+    const [f0, f1, len, level] = { move: [1250, 950, 0.05, 0.12], confirm: [1400, 2600, 0.13, 0.16], back: [1700, 1100, 0.1, 0.12] }[kind];
+    const osc = ctx.createOscillator(), env = ctx.createGain();
+    osc.type = kind === 'move' ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(f1, t + len);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(level, t + 0.006);
+    env.gain.exponentialRampToValueAtTime(0.001, t + len);
+    osc.connect(env).connect(out);
+    osc.start(t); osc.stop(t + len + 0.01);
+  },
+
   // Shepherd's whistle for a dog command, played on the effects bus. Synthesised rather than sampled; the
   // pitch contours are traced from a stockdog handler's whistle demonstration (see WHISTLES).
   whistle(cmd) {

@@ -105,10 +105,18 @@ button.zoom-btn:active { background: rgba(242,193,78,0.22); border-color: var(--
 .menu-item.selected { color: var(--accent); transform: translateX(8px); }
 .menu-group { margin-top: 8px; padding-left: 44px; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent2); }
 .menu-item.drill { font-size: clamp(19px, 2.6vw, 24px); padding-top: 2px; padding-bottom: 2px; }
+/* Options and How to Play: a quieter tier below the modes, set off by a short rule. */
+.menu-sep { width: 48px; height: 1px; margin: 12px 0 6px 44px; background: rgba(238, 242, 230, 0.22); }
+.menu-item.util { font-size: clamp(16px, 2vw, 19px); padding-top: 1px; padding-bottom: 1px; color: rgba(238, 242, 230, 0.55); }
+.menu-item.util::before { border-left-width: 10px; border-top-width: 6px; border-bottom-width: 6px; margin-top: -6px; left: 18px; }
+.menu-item.util.selected { color: var(--accent); }
 .menu-item.selected::before { opacity: 1; transform: none; animation: nudge 0.9s ease-in-out infinite; }
 @keyframes nudge { 50% { transform: translateX(4px); } }
 .menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .menu-desc { margin: 0; min-height: 3em; max-width: 420px; padding-left: 44px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+#menu .menu-desc, #options .menu-desc { margin-top: -12px; color: var(--text); opacity: 0.8; font-size: 15px; }
+.menu-desc.desc-in { animation: desc-in 0.22s ease-out; }
+@keyframes desc-in { from { opacity: 0; transform: translateY(4px); } }
 .menu-hint { padding-left: 44px; font-size: 12px; color: var(--muted); opacity: 0.8; }
 .menu-hint kbd { margin-right: 2px; }
 #overlay.title #help { margin-left: auto; margin-right: auto; }
@@ -238,6 +246,10 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .menu-item::before { left: 10px; }
   .menu-item.selected { transform: translateX(4px); }
   .menu-group, .menu-desc, .map-loc, .map-stats { padding-left: 36px; }
+  .menu-sep { margin-left: 36px; }
+  #menu .menu-desc, #options .menu-desc { margin-top: 0; }
+  .menu-item.util { font-size: 18px; }
+  .menu-item.util::before { left: 13px; }
   .menu-item { max-width: 100%; text-align: left; }
   .eyebrow { font-size: 11px; letter-spacing: 0.16em; }
   .menu-item.map-item { flex-wrap: wrap; column-gap: 10px; row-gap: 0; }
@@ -297,4 +309,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .logo span:last-child { padding-left: 0; }
   .menu-item { font-size: 22px; padding-top: 2px; padding-bottom: 2px; }
   .menu-item.drill { font-size: 18px; }
+  .menu-item.util { font-size: 16px; }
+  .menu-sep { margin-top: 6px; margin-bottom: 2px; }
 }

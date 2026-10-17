@@ -150,8 +150,43 @@ class Game {
   enterAttract() {
     this.mode = 'free';
     this.setup();
-    this.renderer.cam.zoom = this.baseZoom();
+    this.renderer.cam.zoom = this.baseZoom() * 1.15;
+    // The dog lies a little way off the flock, on the side away from the middle of the field.
+    const f = computeFlock(this.sheep), b = this.course.bounds;
+    const [ox, oy] = M.norm(f.x - (b.x + b.w / 2), f.y - (b.y + b.h / 2));
+    this.dog.x = f.x + (ox || 1) * 18; this.dog.y = f.y + oy * 18;
+    this.dog.heading = Math.atan2(f.y - this.dog.y, f.x - this.dog.x);
+    this.dog.steady = true;
+    this.attractAI = { phase: 'REST', t: M.rand(3, 5), target: 0 };
+    this.attractFocus = null;
     this.attractUpdate(0);
+  }
+
+  // Title-screen dog: rests, then flanks round to the outside of the flock and walks them back toward the
+  // middle of the field at half speed, so the backdrop shows a dog quietly working without driving sheep into fences.
+  attractDog(dt) {
+    const a = this.attractAI, dog = this.dog, f = this.flock, b = this.course.bounds;
+    if (!f.n) return;
+    a.t -= dt;
+    const mx = b.x + b.w / 2, my = b.y + b.h / 2;
+    const angle = Math.atan2(dog.y - f.y, dog.x - f.x);
+    const outward = Math.atan2(f.y - my, f.x - mx);
+    const flank = (target) => {
+      const diff = M.angleLerp(angle, target, 1) - angle;
+      a.phase = 'FLANK'; a.target = target; a.t = 6;
+      dog.setCommand(diff > 0 ? 'COMEBYE' : 'AWAY', f);
+      dog.flankR = 18;
+    };
+    if (a.phase === 'FLANK') {
+      if (Math.abs(M.angleLerp(angle, a.target, 1) - angle) < 0.3 || a.t <= 0) { dog.setCommand('STOP'); a.phase = 'REST'; a.t = M.rand(2, 4); }
+    } else if (a.phase === 'WALK') {
+      if (a.t <= 0 || Math.hypot(dog.x - f.x, dog.y - f.y) < 13) { dog.setCommand('STOP'); a.phase = 'REST'; a.t = M.rand(5, 8); }
+    } else if (a.t <= 0) {
+      const off = Math.hypot(f.x - mx, f.y - my);
+      if (off > 20 && Math.abs(M.angleLerp(angle, outward, 1) - angle) > 0.5) flank(outward);
+      else if (off > 20) { dog.setCommand('WALK', f); a.phase = 'WALK'; a.t = 3; }
+      else flank(angle + (Math.random() < 0.5 ? 1 : -1) * M.rand(1.2, 2));
+    }
   }
 
   attractUpdate(dt) {
@@ -159,6 +194,7 @@ class Game {
     const c = this.course, t = this.attractT * 0.05;
     if (c.wind) c.wind.update(dt);
     this.flock = computeFlock(this.sheep);
+    this.attractDog(dt);
     const w = {
       dog: this.dog, handler: this.handler, sheep: this.sheep, flock: this.flock,
       walls: c.walls(), circles: c.circles, bounds: c.bounds, ground: c.ground, wind: c.wind, events: [],
@@ -167,11 +203,20 @@ class Game {
     for (const s of this.sheep) s.update(dt, w);
     for (let i = 0; i < this.sheep.length; i++) for (let j = i + 1; j < this.sheep.length; j++) separateBodies(this.sheep[i], this.sheep[j], SHEEP_CFG.radius, SHEEP_CFG.radius);
     this.handler.update(dt, this.flock.n ? this.flock : this.dog);
-    // Keep the flock framed on the right of the screen, clear of the menu, with a slow sway.
-    const cam = this.renderer.cam, f = this.flock.n ? this.flock : c.start;
-    const side = cam.w / (4 * cam.zoom) * 0.75;
-    cam.x = f.x - side + Math.sin(t * 2) * 3;
-    cam.y = f.y + side + Math.sin(t * 1.4 + 1) * 3;
+    // Keep the flock (and a little of the dog) framed in the open space beside the menu (below it on an upright
+    // phone), with a slow sway. A screen offset (ox, oy) from the centre is a world offset (u, v) with
+    // u - v = ox / zoom and u + v = 2·oy / zoom.
+    const cam = this.renderer.cam, fl = this.flock.n ? this.flock : c.start;
+    const tx = fl.x + (this.dog.x - fl.x) * 0.3, ty = fl.y + (this.dog.y - fl.y) * 0.3;
+    const fc = this.attractFocus || (this.attractFocus = { x: tx, y: ty });
+    const k = Math.min(1, dt * 0.8);
+    fc.x += (tx - fc.x) * k; fc.y += (ty - fc.y) * k;
+    let ox = cam.w * 0.375, oy = 0;
+    if (cam.w >= 900) ox = (Math.min(680, cam.w * 0.45) + cam.w) / 2 - cam.w / 2;
+    else if (cam.h > cam.w * 1.3) { ox = cam.w * 0.15; oy = cam.h * 0.32; }
+    const u = (ox + 2 * oy) / (2 * cam.zoom), v = (2 * oy - ox) / (2 * cam.zoom);
+    cam.x = fc.x - u + Math.sin(t * 2) * 3;
+    cam.y = fc.y - v + Math.sin(t * 1.4 + 1) * 3;
   }
   // One zoom step in from 18, pulled back on small (phone) screens so enough of the field fits.
   baseZoom() {
