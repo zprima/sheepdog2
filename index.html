@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sheepdog Trials 2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2f5223">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="stick" class="hidden"><div class="knob"></div></div>
+
+<div id="hud" class="hidden">
+  <div id="status" class="panel">
+    <div class="row"><span id="hud-mode" class="mode"></span><span id="hud-time" class="time">0:00</span></div>
+    <div id="hud-phase" class="phase"></div>
+    <div id="hud-hint" class="hint"></div>
+    <table id="hud-score" class="score"></table>
+  </div>
+
+  <div id="commands" class="panel">
+    <div class="cmd-title">Commands <span class="sub">arrows: steer the dog directly</span></div>
+    <div class="cmd-grid">
+      <button class="cmd" data-cmd="COMEBYE"><b>Come bye</b><kbd>C</kbd><small>clockwise flank</small></button>
+      <button class="cmd" data-cmd="AWAY"><b>Away</b><kbd>A</kbd><small>anticlockwise flank</small></button>
+      <button class="cmd" data-cmd="WALK"><b>Walk up</b><kbd>W</kbd><small>push toward sheep</small></button>
+      <button class="cmd" data-cmd="STOP"><b>Lie down</b><kbd>Space</kbd><small>stop</small></button>
+      <button class="cmd" data-cmd="OUT"><b>Get out</b><kbd>B</kbd><small>back off wide</small></button>
+      <button class="cmd" data-cmd="HOME"><b>That'll do</b><kbd>T</kbd><small>return to handler</small></button>
+      <button class="cmd toggle" data-cmd="STEADY"><b>Steady</b><kbd>S</kbd><small>half speed</small></button>
+      <button class="cmd" data-cmd="MENU"><b><span class="label-full">Menu</span><span class="label-touch">Pause</span></b><kbd>Esc</kbd><small>pause / modes</small></button>
+    </div>
+  </div>
+
+  <div id="minimap-wrap" class="panel">
+    <div id="zoom-controls">
+      <button class="zoom-btn" data-zoom="in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+      <button class="zoom-btn" data-zoom="out" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
+    </div>
+    <canvas id="minimap"></canvas>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="menu" class="title-screen">
+    <div class="title-block">
+      <div class="eyebrow">Outrun · Lift · Fetch · Drive · Pen</div>
+      <h1 class="logo"><span>Sheepdog</span><span>Trials 2</span></h1>
+      <p class="tag">Work your dog, read your sheep, make the pen.</p>
+    </div>
+    <nav class="menu-list">
+      <button class="menu-item mode-btn" data-mode="trial" data-desc="Full course, timed and scored on the National rules. Ten minutes on the clock. No shed.">Trial Competition</button>
+      <button class="menu-item mode-btn" data-mode="free" data-desc="The same course and scorecard with no clock. Take your time and learn the sheep.">Free Trial</button>
+      <div class="menu-group">Practice drills</div>
+      <button class="menu-item mode-btn drill" data-mode="outrun" data-desc="Send the dog from the post and lift the sheep. Scored out of 30, then the sheep are set out again.">Outrun &amp; Lift</button>
+      <button class="menu-item mode-btn drill" data-mode="fetch" data-desc="Sheep already lifted, dog lying behind them. Fetch them through the gate to the post, out of 20.">Fetch</button>
+      <button class="menu-item mode-btn drill" data-mode="drive" data-desc="Sheep at the post. Drive away, cross drive and bring them to the pen, out of 30.">Drive</button>
+      <button class="menu-item mode-btn drill" data-mode="pen" data-desc="Sheep set out near the pen. Practise the pen over and over, against the clock.">Pen</button>
+      <button class="menu-item" data-action="options" data-desc="Music and sound effect volume.">Options</button>
+      <button class="menu-item" data-action="help" data-desc="Commands, controls and how the judge scores your run.">How to Play</button>
+    </nav>
+    <p id="menu-desc" class="menu-desc"></p>
+    <div class="menu-hint"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>Enter</kbd> confirm</div>
+  </div>
+
+  <div id="maps" class="title-screen hidden">
+    <div class="title-block">
+      <div class="eyebrow" id="maps-mode"></div>
+      <h2 class="logo logo-sm"><span>Choose</span><span>a field</span></h2>
+    </div>
+    <nav class="menu-list" id="map-list"></nav>
+    <div class="map-info">
+      <div class="map-loc" id="map-loc"></div>
+      <p id="map-desc" class="menu-desc"></p>
+      <div class="map-stats" id="map-stats"></div>
+    </div>
+    <div class="menu-hint"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>Enter</kbd> start &nbsp; <kbd>Esc</kbd> back</div>
+  </div>
+
+  <div id="options" class="title-screen hidden">
+    <div class="title-block">
+      <div class="eyebrow">Settings</div>
+      <h2 class="logo logo-sm"><span>Game</span><span>Options</span></h2>
+    </div>
+    <nav class="menu-list" id="options-list">
+      <div class="menu-group">Audio</div>
+      <div class="menu-item opt-row" data-setting="music" data-desc="Volume of the background music.">
+        <span class="opt-name">Music</span><input type="range" min="0" max="100" step="5" tabindex="-1" aria-label="Music volume"><span class="opt-value"></span>
+      </div>
+      <div class="menu-item opt-row" data-setting="sfx" data-desc="Volume of sound effects: whistles, sheep, the dog.">
+        <span class="opt-name">Sound effects</span><input type="range" min="0" max="100" step="5" tabindex="-1" aria-label="Sound effects volume"><span class="opt-value"></span>
+      </div>
+      <button class="menu-item map-back" data-action="back" data-desc="Back to the main menu.">Back</button>
+    </nav>
+    <p id="options-desc" class="menu-desc"></p>
+    <div class="menu-hint"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>←</kbd><kbd>→</kbd> adjust &nbsp; <kbd>Esc</kbd> back</div>
+  </div>
+
+  <div id="help" class="card hidden">
+    <h2>How to Play</h2>
+    <div class="help">
+      <h3>Controls</h3>
+      <ul>
+        <li><kbd>←↑→↓</kbd> steer the dog directly (screen directions)</li>
+        <li><kbd>C</kbd> Come bye – flank clockwise around the sheep</li>
+        <li><kbd>A</kbd> Away – flank anticlockwise</li>
+        <li><kbd>W</kbd> Walk up – move straight at the sheep</li>
+        <li><kbd>Space</kbd> / <kbd>L</kbd> Lie down – stop</li>
+        <li><kbd>S</kbd> Steady – toggle half speed &nbsp; <kbd>B</kbd> Get out &nbsp; <kbd>T</kbd> That'll do</li>
+        <li><kbd>+</kbd> / <kbd>-</kbd> or mouse wheel: zoom &nbsp; <kbd>R</kbd> restart &nbsp; <kbd>Esc</kbd> menu</li>
+      </ul>
+      <h3 class="touch-only">On a phone</h3>
+      <ul class="touch-only">
+        <li>Drag anywhere on the field to steer the dog with the stick</li>
+        <li>Tap the command buttons to whistle; pinch with two fingers to zoom</li>
+        <li>On the field list, tap once to see a field and again to start</li>
+      </ul>
+      <h3>Scoring (90 points)</h3>
+      <p>Outrun 20 · Lift 10 · Fetch 20 · Drive 30 · Pen 10. Points come off for crossing the course, pushing the sheep
+      into a panic, running off line, missing gates and breaks at the pen. The clock starts when you send the dog;
+      the gate closes once all five sheep stand in the pen.</p>
+      <h3>Practice drills</h3>
+      <p>Each drill sets up one part of the course and judges it exactly as in a trial. When a run is complete the
+      score and the costliest fault show briefly, then the sheep are set out again. Press <kbd>R</kbd> to reset early.</p>
+    </div>
+    <div class="btn-row">
+      <button id="btn-help-back">Back <kbd>Esc</kbd></button>
+    </div>
+  </div>
+
+  <div id="pause" class="card hidden">
+    <h2>Paused</h2>
+    <div class="btn-row">
+      <button id="btn-resume">Resume</button>
+      <button id="btn-restart">Restart</button>
+      <button id="btn-retire">Retire to menu</button>
+    </div>
+  </div>
+
+  <div id="result" class="card hidden">
+    <h2 id="result-title">Run complete</h2>
+    <p id="result-sub"></p>
+    <table id="result-table"></table>
+    <ul id="result-notes"></ul>
+    <div class="btn-row">
+      <button id="btn-again">Run again</button>
+      <button id="btn-menu">Menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script src="js/math.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/music.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/map.js"></script>
+<script src="js/wind.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/sheep.js"></script>
+<script src="js/dog.js"></script>
+<script src="js/handler.js"></script>
+<script src="js/trial.js"></script>
+<script src="js/render.js"></script>
+<script src="js/minimap.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/input.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
