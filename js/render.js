@@ -363,11 +363,12 @@ class Renderer {
       const k = t.kind || 'oak';
       if (k === 'hayrack') { for (let f = -0.5; f <= 0.5; f += 0.25) this.shadow(t.x + t.len * f + 1, t.y + 1, 1.6 * z, 0.8 * z); continue; }
       if (k === 'aqueduct') continue;
+      if (k === 'rock') continue;   // drawRock casts its own shadow tight under the stone
       if (k === 'hut') { this.shadow(t.x + 2, t.y + 2, t.r * 1.5 * z, t.r * 0.8 * z); continue; }
       if (k === 'torii') { for (const f of [-0.5, 0.5]) this.shadow(t.x + t.len * f + 0.8, t.y + 0.8, 0.5 * z, 0.25 * z); continue; }
       if (k === 'flagpole') { this.shadow(t.x + 0.3, t.y + 0.3, 0.4 * z, 0.2 * z); continue; }
       if (LANDMARKS.has(k)) { this.shadow(t.x + t.r * 0.4, t.y + t.r * 0.4, t.r * 1.4 * z, t.r * 0.7 * z); continue; }
-      const low = k === 'rock' || k === 'shrub' || k === 'palmetto' || k === 'cactus' || k === 'haystack' || k === 'lantern' || k === 'column' || k === 'shrine';
+      const low = k === 'shrub' || k === 'palmetto' || k === 'cactus' || k === 'haystack' || k === 'lantern' || k === 'column' || k === 'shrine';
       const s = k === 'palm' || k === 'birch' ? 0.7 : k === 'cypress' ? 0.45 : k === 'column' || k === 'shrine' ? 0.5 : low ? 0.9 : 1;
       this.shadow(t.x + t.r * 0.4, t.y + t.r * 0.4, t.r * z * s, t.r * z * s * 0.5);
     }
@@ -680,16 +681,27 @@ class Renderer {
   // Boulder: a lumpy grey mound with a lit top.
   drawRock(t) {
     const ctx = this.ctx, z = this.cam.zoom, [bx, by] = this.cam.toScreen(t.x, t.y), r = t.r * z;
-    ctx.fillStyle = '#7c7d77';
-    ctx.beginPath();
-    for (let k = 0; k <= 8; k++) {
-      const a = Math.PI + (k / 8) * Math.PI, w = 0.8 + 0.35 * M.hash2(k, Math.round(t.seed * 1000));
-      const x = bx + Math.cos(a) * r * w, y = by + r * 0.1 + Math.sin(a) * r * 0.75 * w;
-      k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    }
-    ctx.quadraticCurveTo(bx, by + r * 0.45, bx - r * 0.9, by + r * 0.1);
-    ctx.fill();
-    ctx.fillStyle = '#9fa099';
+    // Shadow cast away from the sun (upper left), so the stone sits on the ground rather than on top of it.
+    ctx.fillStyle = 'rgba(20,30,15,0.22)';
+    ctx.beginPath(); ctx.ellipse(bx + r * 0.1, by + r * 0.24, r * 0.92, r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+    const body = () => {
+      ctx.beginPath();
+      for (let k = 0; k <= 8; k++) {
+        const a = Math.PI + (k / 8) * Math.PI, w = 0.8 + 0.35 * M.hash2(k, Math.round(t.seed * 1000));
+        const x = bx + Math.cos(a) * r * w, y = by + r * 0.1 + Math.sin(a) * r * 0.75 * w;
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.quadraticCurveTo(bx, by + r * 0.45, bx - r * 0.9, by + r * 0.1);
+    };
+    body();
+    ctx.fillStyle = '#7c7d77'; ctx.fill();
+    ctx.strokeStyle = 'rgba(40,40,38,0.55)'; ctx.lineWidth = Math.max(0.6, r * 0.06); ctx.stroke();
+    // Darker shaded flank on the side away from the sun.
+    ctx.save(); body(); ctx.clip();
+    ctx.fillStyle = 'rgba(45,45,42,0.35)';
+    ctx.beginPath(); ctx.ellipse(bx + r * 0.55, by + r * 0.15, r * 0.7, r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#a9aaa2';
     ctx.beginPath(); ctx.ellipse(bx - r * 0.15, by - r * 0.35, r * 0.5, r * 0.25, -0.15, 0, Math.PI * 2); ctx.fill();
   }
 

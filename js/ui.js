@@ -356,10 +356,10 @@ class UI {
     }
   }
 
-  // A triangle on the screen edge pointing toward the flock while it's out of view.
+  // A triangle on the screen edge pointing toward the flock while it's out of view (not in pasture).
   updateFlockPointer(g) {
     const el = this.$('flock-pointer'), f = g.flock, cam = g.renderer.cam;
-    const show = f && f.n && !g.paused && !(g.trial && g.trial.result);
+    const show = f && f.n && !g.paused && !(g.trial && (g.trial.result || g.trial.pasture));
     const [sx, sy] = show ? cam.toScreen(f.x, f.y) : [0, 0];
     const pad = 24;
     if (!show || (sx > pad && sy > pad && sx < cam.w - pad && sy < cam.h - pad)) { el.classList.add('hidden'); return; }
