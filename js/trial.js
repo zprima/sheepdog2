@@ -23,13 +23,16 @@ const DRILLS = {
   fetch:  { name: 'Fetch training', phases: ['FETCH', 'DONE'], best: 'score' },
   drive:  { name: 'Drive training', phases: ['DRIVE1', 'DRIVE2', 'DRIVE3', 'DONE'], best: 'score' },
 };
-const MODE_NAMES = { trial: 'Trial competition', free: 'Untimed trial' };
+const MODE_NAMES = { trial: 'Trial competition', free: 'Untimed trial', pasture: 'Pasture' };
+const PASTURE_SHEEP = 50;                  // per mob; pasture sets out two
+const PASTURE_LOOSE = { flocking: 0.6, space: 1.6 };   // pasture sheep keep further apart and drift off more
 for (const [k, d] of Object.entries(DRILLS)) MODE_NAMES[k] = d.name;
 
 class Trial {
   constructor(course, mode) {
     this.course = course;
-    this.mode = mode;                       // 'trial' | 'free' | a DRILLS key
+    this.mode = mode;                       // 'trial' | 'free' | 'pasture' | a DRILLS key
+    this.pasture = mode === 'pasture';      // open field: nothing is judged or timed
     this.drill = DRILLS[mode] || null;
     this.phases = this.drill ? this.drill.phases : TRIAL_PHASES;
     this.phaseIdx = 0;
@@ -47,6 +50,7 @@ class Trial {
     this.liftPoint = null;
     this.panicCooldown = 0;
     this.result = null;
+    this.unfinished = null;                 // the section still being worked when a run was retired or timed out
     this.onPhase = null;                    // callback(phase)
     this.toast = null;                      // callback(text)
     this.enterPhase();
@@ -68,7 +72,10 @@ class Trial {
     this.notes.set(key, n);
   }
 
-  score(cat) { return this.reached.has(cat) ? POINTS[cat] - this.deductions[cat] : 0; }
+  // A section scores what's left after deductions, once reached; one left unfinished at the end scores nothing.
+  score(cat) { return this.reached.has(cat) && cat !== this.unfinished ? POINTS[cat] - this.deductions[cat] : 0; }
+  // The most this run can still score: everything not yet deducted.
+  possible() { return this.categories.reduce((t, c) => t + POINTS[c] - this.deductions[c], 0); }
   total() { let t = 0; for (const c of Object.keys(POINTS)) t += this.score(c); return t; }
   // Categories this run is judged on, in course order, and what they are worth together.
   get categories() { return Object.keys(POINTS).filter(c => this.phases.some(p => PHASE_CAT[p] === c)); }
@@ -97,6 +104,7 @@ class Trial {
 
   finish(outcome) {
     if (this.result) return;
+    if (outcome !== 'COMPLETE') this.unfinished = PHASE_CAT[this.phase] || null;
     this.phase = 'DONE';
     this.result = { outcome, total: this.total(), time: this.time };
     if (this.onPhase) this.onPhase('DONE');
@@ -147,7 +155,7 @@ class Trial {
 
   // --- main update -------------------------------------------------------
   update(dt, w) {
-    if (this.result || !this.started) return;
+    if (this.result || !this.started || this.pasture) return;
     this.time += dt;
     this.phaseTime += dt;
     this.panicCooldown = Math.max(0, this.panicCooldown - dt);

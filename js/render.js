@@ -101,6 +101,7 @@ class Renderer {
 
     items.sort((a, b) => a.depth - b.depth);
     for (const it of items) it.fn();
+    this.drawWhistle(game);
     this.drawWeather(c.map.weather, dt);
     if (this.wind) this.drawWind(this.wind, dt);
   }
@@ -248,9 +249,46 @@ class Renderer {
   }
 
   // Where the current phase wants things to go, and what is heading there (the dog on the outrun, the flock after).
+  // The last command, shown as a tag rising over the dog (and sound rings at the handler when in view), so
+  // commands can be read with the sound off. Fades out over about a second and a half.
+  drawWhistle(game) {
+    const w = game.lastWhistle;
+    if (!w || game.inMenu) return;
+    const age = (performance.now() - w.t) / 1000, life = 1.5;
+    if (age > life) return;
+    const ctx = this.ctx, z = this.cam.zoom, fade = age < 0.12 ? age / 0.12 : 1 - Math.max(0, (age - 0.9) / (life - 0.9));
+    ctx.save();
+    // Rings spreading from the handler.
+    const [hx, hy] = this.cam.toScreen(game.handler.x, game.handler.y, 1.7);
+    if (this.onScreen(hx, hy)) {
+      ctx.strokeStyle = '#fff6dc'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 2; i++) {
+        const a = age * 1.6 - i * 0.25;
+        if (a <= 0 || a >= 1) continue;
+        ctx.globalAlpha = (1 - a) * 0.7;
+        ctx.beginPath(); ctx.arc(hx, hy, z * (0.4 + a * 1.6), -Math.PI * 0.8, -Math.PI * 0.2); ctx.stroke();
+      }
+    }
+    // Tag over the dog.
+    const label = w.cmd === 'STEADY' ? (w.steady ? 'Steady' : 'Steady off') : WHISTLE_LABEL[w.cmd];
+    if (label) {
+      const [dx, dy] = this.cam.toScreen(game.dog.x, game.dog.y, 1.4 + age * 0.8);
+      const text = `\u266A ${label}`;
+      ctx.font = '600 13px "Avenir Next", "Segoe UI", system-ui, sans-serif';
+      const tw = ctx.measureText(text).width, bw = tw + 16, bh = 22, bx = dx - bw / 2, by = dy - bh - 6;
+      ctx.globalAlpha = fade * 0.92;
+      ctx.fillStyle = 'rgba(16, 24, 12, 0.85)';
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 11); ctx.fill();
+      ctx.strokeStyle = 'rgba(242, 193, 78, 0.7)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = '#f2c14e'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      ctx.fillText(text, dx, by + bh / 2 + 0.5);
+    }
+    ctx.restore();
+  }
+
   objective(game) {
     const t = game.trial, c = game.course, f = game.flock;
-    if (game.inMenu || !t || t.result || !f || !f.n) return null;
+    if (game.inMenu || !t || t.result || t.pasture || !f || !f.n) return null;
     switch (t.phase) {
       case 'OUTRUN': return { from: game.dog, to: f, gap: 2 };
       case 'LIFT': return { from: f, to: c.post, gap: f.spread + 2.5 };
@@ -1356,9 +1394,8 @@ class Renderer {
     ctx.stroke();
 
     // Body.
-    const cream = `hsl(42, ${30 + s.tint * 20}%, ${86 + s.tint * 6}%)`;
     ctx.save(); ctx.translate(sx, bodyY); ctx.rotate(ang);
-    ctx.fillStyle = cream; ctx.strokeStyle = '#b5a888'; ctx.lineWidth = 1;
+    ctx.fillStyle = s.fleece; ctx.strokeStyle = '#b5a888'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.ellipse(0, 0, 0.62 * z * fore, 0.36 * z, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.beginPath(); ctx.ellipse(-0.05 * z, -0.1 * z, 0.4 * z * fore, 0.16 * z, 0, 0, Math.PI * 2); ctx.fill();
@@ -1542,3 +1579,5 @@ class Renderer {
     }
   }
 }
+
+const WHISTLE_LABEL = { COMEBYE: 'Come bye', AWAY: 'Away', WALK: 'Walk up', STOP: 'Lie down', OUT: 'Get out', HOME: "That'll do" };

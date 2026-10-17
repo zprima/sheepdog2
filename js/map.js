@@ -38,7 +38,7 @@ const MAPS = [
   {
     id: 'texas',
     name: 'Dry Creek Ranch',
-    location: 'Texas, USA',
+    location: 'Texas, USA', flag: 'us', country: 'United States',
     blurb: 'Big, sun-baked ranch country: mostly bare dirt with tufts of dry grass, a gravel creek bed, mesquite, prickly pear and rocks. The longest outrun of any field.',
     width: 190,
     height: 230,
@@ -80,7 +80,7 @@ const MAPS = [
   {
     id: 'slovenia',
     name: 'Planina pod Vrhom',
-    location: 'Slovenia',
+    location: 'Slovenia', flag: 'si', country: 'Slovenia',
     blurb: 'A green alpine pasture flecked with wildflowers. The ground climbs gently toward the sheep, so the outrun is uphill and the fetch runs downhill fast. Spruce woods and a kozolec hayrack.',
     width: 150,
     height: 190,
@@ -109,7 +109,7 @@ const MAPS = [
   {
     id: 'england',
     name: 'Ashby Levels',
-    location: 'England',
+    location: 'England', flag: 'gb-eng', country: 'England',
     blurb: 'Flat, lush lowland grass with daisies, hedgerows all round and old oaks. A soft English drizzle is falling and puddles have gathered in the low spots, but no excuses here: a fair field for a clean run.',
     width: 160,
     height: 170,
@@ -157,7 +157,7 @@ const MAPS = [
   {
     id: 'scotland',
     name: 'Glen Corrie',
-    location: 'Scottish Highlands',
+    location: 'Scotland', flag: 'gb-sct', country: 'Scotland',
     blurb: 'Rough hill grazing on the side of a glen. Rolling, uneven ground rising to the sheep, with tussocky grass, patches of heather and bracken that slow everything down, granite boulders, gorse and Scots pine inside a dry-stone dyke. A gusty westerly blows across the glen, pushing the sheep east, and mist drifts through.',
     width: 170,
     height: 200,
@@ -193,7 +193,7 @@ const MAPS = [
   {
     id: 'finland',
     name: 'Koivuniemi',
-    location: 'Lakeland, Finland',
+    location: 'Finland', flag: 'fi', country: 'Finland',
     blurb: 'Late-autumn pasture on a birch-wooded point in the Finnish lakeland. Pale grass with drifts of early snow that the sheep wade through slowly, haystacks and spruce, a red mökki and sauna down by the lake shore to the west, and fresh flakes falling.',
     width: 160,
     height: 190,
@@ -240,7 +240,7 @@ const MAPS = [
   {
     id: 'florida',
     name: 'Palmetto Point',
-    location: 'Florida, USA',
+    location: 'Florida, USA', flag: 'us', country: 'United States',
     blurb: 'A coastal field running down to the Gulf. Bright turf dotted with shallow pools the sheep wade through slowly, turning to soft, slow sand toward the beach on the east side, with cabbage palms and saw palmetto. Surf rolls in beyond the fence.',
     width: 150,
     height: 180,
@@ -285,7 +285,7 @@ const MAPS = [
   {
     id: 'japan',
     name: 'Sakura no Oka',
-    location: 'Yoshino, Japan',
+    location: 'Japan', flag: 'jp', country: 'Japan',
     blurb: 'A gently rolling hillside in full spring blossom. Cherry trees crowd the edges and shed their petals over the grass, stone lanterns stand among them, and a vermilion torii looks down on the sheep from beyond a bamboo fence.',
     width: 140,
     height: 150,
@@ -319,7 +319,7 @@ const MAPS = [
   {
     id: 'italy',
     name: 'Via Appia',
-    location: 'Roman Campagna, Italy',
+    location: 'Italy', flag: 'it', country: 'Italy',
     blurb: 'Sun-warmed pasture outside Rome, green and gold and splashed with poppies. The old basalt paving of the Via Appia runs dead straight across the top of the field, a ruined aqueduct marches along the skyline, and umbrella pines, cypresses and broken columns line the way.',
     width: 160,
     height: 190,
@@ -370,7 +370,7 @@ const MAPS = [
   {
     id: 'austria',
     name: 'Hinterjoch Alm',
-    location: 'Tyrol, Austria',
+    location: 'Austria', flag: 'at', country: 'Austria',
     blurb: 'A steep summer alm high above the valley. The pasture climbs toward the sheep and tilts up to the east as well, so every leg runs across the slope. Flowery turf gives way to slow limestone scree near the top, among spruce, larch, alpine roses and a log hut, all inside a Tyrolean slanted-rail fence.',
     width: 150,
     height: 180,
@@ -498,6 +498,9 @@ function scatterProps(map, ground) {
   }
   return out;
 }
+
+// Fields run in country order (the home field, which has none, first), then by name within a country.
+MAPS.sort((a, b) => (a.country || '').localeCompare(b.country || '') || a.name.localeCompare(b.name));
 
 function mapById(id) { return MAPS.find(m => m.id === id) || MAPS[0]; }
 

@@ -2,7 +2,8 @@
 // Audio settings and mixer: separate music and sound-effect volumes (0–100), saved between visits.
 // Anything that plays sound should connect to Sound.bus('music') or Sound.bus('sfx').
 const Sound = {
-  volume: { music: 0, sfx: 0 },   // off until the player turns them up in Options
+  volume: { music: 0, sfx: 10 },  // music off and effects quiet until the player turns them up in Options
+  muted: false,                   // the in-run mute button: silences both buses without touching the volumes
   ctx: null,
   buses: {},
 
@@ -10,13 +11,29 @@ const Sound = {
     try {
       const saved = JSON.parse(localStorage.getItem('sheepdog.audio') || '{}');
       for (const k of Object.keys(this.volume)) if (Number.isFinite(saved[k])) this.volume[k] = M.clamp(saved[k], 0, 100);
+      this.muted = saved.muted === true;
     } catch (e) { /* storage unavailable */ }
   },
 
   set(kind, v) {
     this.volume[kind] = M.clamp(Math.round(v), 0, 100);
-    if (this.buses[kind]) this.buses[kind].gain.value = this.volume[kind] / 100;
-    try { localStorage.setItem('sheepdog.audio', JSON.stringify(this.volume)); } catch (e) { /* storage unavailable */ }
+    if (this.volume[kind] > 0) this.muted = false; // turning a slider up is a clear wish to hear it
+    this.apply();
+  },
+
+  // True when nothing would be heard, whether muted or with both sliders at zero.
+  get silent() { return this.muted || Object.values(this.volume).every(v => v <= 0); },
+
+  toggleMute() {
+    if (this.silent && !this.muted) this.volume.sfx = 10; // both sliders were down: unmuting brings the effects back
+    else this.muted = !this.muted;
+    if (!this.muted) this.bus('sfx');                     // the click is a user gesture, so audio may start now
+    this.apply();
+  },
+
+  apply() {
+    for (const k of Object.keys(this.buses)) this.buses[k].gain.value = this.muted ? 0 : this.volume[k] / 100;
+    try { localStorage.setItem('sheepdog.audio', JSON.stringify({ ...this.volume, muted: this.muted })); } catch (e) { /* storage unavailable */ }
   },
 
   // Web Audio starts lazily (browsers only allow it after a user gesture); each kind gets its own gain bus.
@@ -27,7 +44,7 @@ const Sound = {
       this.ctx = new AC();
       for (const k of Object.keys(this.volume)) {
         const g = this.ctx.createGain();
-        g.gain.value = this.volume[k] / 100;
+        g.gain.value = this.muted ? 0 : this.volume[k] / 100;
         g.connect(this.ctx.destination);
         this.buses[k] = g;
       }

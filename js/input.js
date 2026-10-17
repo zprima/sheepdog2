@@ -95,6 +95,7 @@ class Input {
     if (!down) return;
     if (e.code === 'Equal' || e.code === 'NumpadAdd') { this.game.zoomBy(1.15); return; }
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') { this.game.zoomBy(1 / 1.15); return; }
+    if (e.code === 'KeyM') { this.game.ui.toggleMute(); return; }
     const cmd = KEY_CMDS[e.code];
     if (cmd) { e.preventDefault(); this.game.command(cmd); }
   }

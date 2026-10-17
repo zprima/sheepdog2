@@ -4,7 +4,8 @@
 // generated once per style from a fixed seed, so a field always plays the same tune.
 // The menu screens play their own theme (MUSIC_STYLES.menu); a field's style starts when a run is set up.
 // Layers: a bed of held chords (or a drone) and a lead melody that plays every other phrase while the field is
-// quiet; once the trial is under way the lead plays every phrase and a rhythm section (work layer) fades in.
+// quiet; once the trial is under way the tempo picks up, the lead plays every phrase and a rhythm section (work
+// layer) fades in, with a fill at the end of every other phrase.
 // The music ducks under whistles, is muffled while paused, and a short sting marks the end of a run.
 const Music = {
   cur: null,        // the playing style instance
@@ -12,9 +13,10 @@ const Music = {
 
   get active() { return !!this.cur; },
 
-  // Called every frame. Does nothing until audio has been started by a user gesture.
+  // Called every frame. Does nothing until audio has been started by a user gesture, and the chain (reverb
+  // included) isn't built until the music volume is first turned up.
   update(game) {
-    if (!Sound.ctx) return;
+    if (!Sound.ctx || (!this.mix && Sound.volume.music <= 0)) return;
     this.build();
     const ctx = Sound.ctx, now = ctx.currentTime;
     // The title and field-select screens have their own theme; the field's music starts with a run.
@@ -39,7 +41,18 @@ const Music = {
 
     // After the tab was hidden (no frames) pick up from now rather than racing through the missed notes.
     if (s.next < now - 0.05) s.next = now + 0.05;
-    while (s.next < now + this.LOOKAHEAD) { this.scheduleStep(s, s.step, s.next); s.step++; s.next += s.stepDur; }
+    while (s.next < now + this.LOOKAHEAD) {
+      if (s.step % s.steps === 0) this.setTempo(s);
+      this.scheduleStep(s, s.step, s.next); s.step++; s.next += s.stepDur;
+    }
+  },
+
+  // At each bar line, ease the tempo towards the style's working tempo (once the run is under way) or its quiet
+  // one, a few bpm per bar, so the music picks up over a couple of bars rather than jumping.
+  setTempo(s) {
+    const target = (s.working && s.style.workBpm) || s.style.bpm, d = target - s.bpm;
+    s.bpm += Math.sign(d) * Math.min(Math.abs(d), 10);
+    s.stepDur = 60 / s.bpm / s.style.sub;
   },
 
   // Fixed chain after the per-style layers: mix -> duck -> muffle -> pause -> music bus, with a reverb send.
@@ -83,12 +96,12 @@ const Music = {
     out.connect(this.mix);
     const s = {
       id, style, out, bed: mk(1), lead: mk(0.75), work: mk(0), drones: [], working: false,
-      stepDur: 60 / style.bpm / style.sub, step: 0, next: now + 0.1,
+      bpm: style.bpm, stepDur: 60 / style.bpm / style.sub, step: 0, next: now + 0.1,
       steps: style.beats * style.sub,
     };
     const seed = [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-    s.melA = genMelody(style, seed);
-    s.melB = genMelody(style, seed + 1);
+    s.melA = style.melA ? fixedMelody(style, style.melA) : genMelody(style, seed);
+    s.melB = style.melB ? fixedMelody(style, style.melB) : genMelody(style, seed + 1);
     if (style.bed.inst === 'drone') this.startDrone(s);
     this.cur = s;
   },
@@ -138,6 +151,10 @@ const Music = {
         if (pick === 'chord') {
           [0, 2, 4].forEach((i, k) => voice(e.inst, midiHz(deg(chord + i, e.oct)), t + k * 0.014, dur, vel, s.work));
         } else voice(e.inst, midiHz(deg(chord + [0, 2, 4, st.scale.length][pick], e.oct)), t, dur, vel, s.work);
+      }
+      // A fill through the second half of every other phrase's last bar, building into the next phrase.
+      if (st.fill && phrase % 2 === 1 && barIn === 7 && inBar >= S / 2) {
+        voice(st.fill, 0, t, 0.2, 0.45 + 0.6 * (inBar - S / 2) / (S / 2), s.work);
       }
     }
   },
@@ -219,6 +236,14 @@ function genMelody(st, seed) {
   // Cadence: one bar of melody, then the tonic held through the last bar.
   put(6, gen(6, 1));
   out[7 * S] = { deg: prev >= 4 ? n : 0, len: S };
+  return out;
+}
+
+// A written-out 8-bar melody, given as [deg, len] pairs played back to back, in the same step layout as genMelody.
+function fixedMelody(st, notes) {
+  const out = new Array(8 * st.beats * st.sub);
+  let pos = 0;
+  for (const [deg, len] of notes) { out[pos] = { deg, len }; pos += len; }
   return out;
 }
 
@@ -373,7 +398,8 @@ function voice(inst, f, t, dur, vel, out, grace) {
 
 // --- styles ----------------------------------------------------------------
 // beats × sub steps per bar; chords are scale degrees per bar of the 8-bar loop (bars 5–6 repeat bars 1–2).
-// lead.lens are note lengths in steps. work entries play on the listed steps of each bar: `pick` indexes the
+// bpm is the quiet tempo and workBpm the tempo once a run is under way; fill is the percussion voice for the
+// phrase-end fill while working. lead.lens are note lengths in steps. work entries play on the listed steps of each bar: `pick` indexes the
 // chord tones [root, third, fifth, octave] or 'chord' for a strum; no pick means unpitched percussion.
 const SCALES = {
   major: [0, 2, 4, 5, 7, 9, 11],
@@ -384,121 +410,158 @@ const SCALES = {
 };
 
 const MUSIC_STYLES = {
-  // Title and field-select screens: a bright, unhurried theme in D on whistle and harp, not tied to any field.
+  // Title and field-select screens: a broad, written-out anthem in E-flat on a mellow horn over strings, with
+  // rolling harp and a soft drum — not tied to any field, and unlike any field's generated tunes.
   menu: {
-    bpm: 84, beats: 4, sub: 2, root: 50, scale: SCALES.major, chords: [0, 4, 5, 3, 0, 4, 3, 0],
-    bed: { inst: 'strings', oct: 0, vel: 0.7 },
-    lead: { inst: 'whistle', oct: 1, vel: 0.85, lens: [2, 2, 1, 1, 2, 4, 6], rest: 0.12 },
+    bpm: 72, beats: 4, sub: 2, root: 51, scale: SCALES.major, chords: [0, 5, 3, 4, 0, 5, 3, 0],
+    bed: { inst: 'strings', oct: 0, vel: 0.75 },
+    lead: { inst: 'horn', oct: 1, vel: 1 },
+    melA: [
+      [4, 3], [5, 1], [4, 2], [2, 2],   [7, 3], [6, 1], [5, 4],
+      [3, 2], [5, 2], [7, 3], [5, 1],   [4, 6], [2, 1], [3, 1],
+      [4, 3], [5, 1], [4, 2], [2, 2],   [7, 3], [8, 1], [9, 4],
+      [8, 2], [7, 2], [5, 2], [3, 2],   [2, 2], [1, 2], [0, 4],
+    ],
+    melB: [
+      [7, 4], [6, 2], [4, 2],           [5, 6], [7, 2],
+      [8, 3], [7, 1], [5, 2], [3, 2],   [4, 4], [6, 2], [4, 2],
+      [2, 3], [4, 1], [7, 4],           [9, 3], [8, 1], [7, 2], [5, 2],
+      [7, 2], [5, 2], [3, 2], [1, 2],   [2, 2], [0, 6],
+    ],
     work: [
-      { inst: 'harp', at: [0, 2, 3, 4, 6, 7], pick: [0, 2, 3, 1, 2, 3], oct: 0, vel: 0.6, len: 2 },
-      { inst: 'bass', at: [0, 4], pick: [0, 2], oct: -1, vel: 0.8 },
+      { inst: 'harp', at: [0, 1, 2, 3, 4, 5, 6, 7], pick: [0, 2, 3, 2, 1, 2, 3, 2], oct: 0, vel: 0.55, len: 2 },
+      { inst: 'bass', at: [0, 4, 6], pick: [0, 2, 0], oct: -1, vel: 0.9 },
+      { inst: 'drum', at: [0, 6], vel: [0.45, 0.25] },
     ],
   },
-  // Home field: a gentle jig-time tune on tin whistle over soft strings and a harp.
+  // Home field: a gentle jig on tin whistle over soft strings and a harp; a lively jig with bodhrán once working.
   'hollow-meadow': {
-    bpm: 60, beats: 2, sub: 3, root: 55, scale: SCALES.major, chords: [0, 3, 0, 4, 0, 3, 4, 0],
+    bpm: 64, workBpm: 96, beats: 2, sub: 3, root: 55, scale: SCALES.major, chords: [0, 3, 0, 4, 0, 3, 4, 0],
     bed: { inst: 'pad', oct: 0, vel: 1 },
     lead: { inst: 'whistle', oct: 1, vel: 0.9, lens: [3, 3, 2, 1, 1, 6], rest: 0.15 },
+    fill: 'snare',
     work: [
       { inst: 'harp', at: [0, 1, 2, 3, 4, 5], pick: [0, 1, 2, 3, 2, 1], oct: 0, vel: 0.8, len: 1 },
-      { inst: 'bass', at: [0, 3], pick: [0, 2], oct: -1, vel: 1 },
+      { inst: 'bass', at: [0, 2, 3, 5], pick: [0, 2, 0, 2], oct: -1, vel: [1, 0.6] },
+      { inst: 'drum', at: [0, 3], vel: [0.7, 0.5] },
+      { inst: 'tick', at: [0, 1, 2, 3, 4, 5], vel: [0.8, 0.35, 0.55] },
     ],
   },
-  // Texas: slow, open guitar over a low pad; boom-chick and brushes once working.
+  // Texas: slow, open guitar over a low pad; a train beat with boom-chick bass once working.
   texas: {
-    bpm: 74, beats: 4, sub: 2, root: 52, scale: SCALES.major, chords: [0, 3, 0, 4, 0, 3, 4, 0],
+    bpm: 76, workBpm: 108, beats: 4, sub: 2, root: 52, scale: SCALES.major, chords: [0, 3, 0, 4, 0, 3, 4, 0],
     bed: { inst: 'pad', oct: 0, vel: 0.8 },
     lead: { inst: 'guitar', oct: 1, vel: 0.9, lens: [2, 2, 4, 1, 1, 6, 3], rest: 0.3 },
+    fill: 'snare',
     work: [
-      { inst: 'bass', at: [0, 4], pick: [0, 2], oct: -1, vel: 1 },
-      { inst: 'guitar', at: [2, 6], pick: ['chord'], oct: 0, vel: 0.45, len: 1 },
-      { inst: 'tick', at: [1, 3, 5, 7], vel: [0.6, 1] },
+      { inst: 'bass', at: [0, 2, 4, 6], pick: [0, 2, 0, 2], oct: -1, vel: 1 },
+      { inst: 'guitar', at: [1, 3, 5, 7], pick: ['chord'], oct: 0, vel: 0.4, len: 1 },
+      { inst: 'snare', at: [2, 6], vel: 0.55 },
+      { inst: 'tick', at: [0, 1, 2, 3, 4, 5, 6, 7], vel: [0.4, 0.9] },
     ],
   },
-  // Slovenia: an alpine waltz on accordion, oom-pah-pah when working.
+  // Slovenia: an alpine waltz on accordion; a brisk oom-pah-pah once working.
   slovenia: {
-    bpm: 108, beats: 3, sub: 2, root: 53, scale: SCALES.major, chords: [0, 4, 3, 0, 0, 4, 4, 0],
+    bpm: 108, workBpm: 138, beats: 3, sub: 2, root: 53, scale: SCALES.major, chords: [0, 4, 3, 0, 0, 4, 4, 0],
     bed: { inst: 'pad', oct: 0, vel: 0.8 },
     lead: { inst: 'accordion', oct: 1, vel: 0.9, lens: [2, 1, 1, 2, 2, 4], rest: 0.1 },
+    fill: 'snare',
     work: [
       { inst: 'bass', at: [0], pick: [0], oct: -1, vel: 1 },
       { inst: 'accordion', at: [2, 4], pick: ['chord'], oct: 0, vel: 0.5, len: 1 },
+      { inst: 'pluck', at: [1, 3, 5], pick: [3, 2, 1], oct: 1, vel: 0.35, len: 1 },
+      { inst: 'tick', at: [2, 4], vel: 0.6 },
     ],
   },
-  // England: a pastoral flute air over strings, harp arpeggios when working.
+  // England: a pastoral flute air over strings; a morris-dance step with harp and bells once working.
   england: {
-    bpm: 78, beats: 4, sub: 2, root: 50, scale: SCALES.major, chords: [0, 5, 3, 4, 0, 5, 4, 0],
+    bpm: 80, workBpm: 104, beats: 4, sub: 2, root: 50, scale: SCALES.major, chords: [0, 5, 3, 4, 0, 5, 4, 0],
     bed: { inst: 'strings', oct: 0, vel: 0.85 },
     lead: { inst: 'flute', oct: 1, vel: 0.9, lens: [2, 2, 2, 4, 1, 1, 6, 3], rest: 0.15 },
+    fill: 'tick',
     work: [
       { inst: 'harp', at: [0, 1, 2, 3, 4, 5, 6, 7], pick: [0, 1, 2, 3, 2, 1, 2, 1], oct: 0, vel: 0.7, len: 1 },
-      { inst: 'bass', at: [0, 4], pick: [0, 0], oct: -1, vel: 0.9 },
+      { inst: 'bass', at: [0, 3, 4, 6], pick: [0, 2, 0, 2], oct: -1, vel: 0.9 },
+      { inst: 'drum', at: [0, 4], vel: [0.55, 0.4] },
+      { inst: 'tick', at: [2, 3, 6, 7], vel: [0.8, 0.4] },
     ],
   },
-  // Scotland: pipe tune in A mixolydian over a drone, with grace notes; drum and snare when working.
+  // Scotland: pipe tune in A mixolydian over a drone, with grace notes; a pipe-band march once working.
   scotland: {
-    bpm: 70, beats: 4, sub: 2, root: 57, scale: SCALES.mixolydian, chords: [0, 6, 0, 4, 0, 6, 6, 0],
+    bpm: 72, workBpm: 96, beats: 4, sub: 2, root: 57, scale: SCALES.mixolydian, chords: [0, 6, 0, 4, 0, 6, 6, 0],
     bed: { inst: 'drone', oct: 0, vel: 1 },
     lead: { inst: 'pipes', oct: 1, vel: 0.85, lens: [3, 1, 2, 2, 4, 1, 1], rest: 0.05, grace: 79 },
+    fill: 'snare',
     work: [
-      { inst: 'drum', at: [0, 4], vel: [1, 0.6] },
-      { inst: 'snare', at: [2, 6, 7], vel: [0.8, 0.8, 0.4] },
+      { inst: 'drum', at: [0, 4], vel: [1, 0.7] },
+      { inst: 'snare', at: [1, 2, 3, 5, 6, 7], vel: [0.35, 0.8, 0.4, 0.35, 0.8, 0.5] },
       { inst: 'bass', at: [0, 4], pick: [0, 2], oct: -1, vel: 0.8 },
     ],
   },
-  // Finland: a kantele tune in D dorian over soft strings; accordion and a walking bass once working.
+  // Finland: a kantele tune in D dorian over soft strings; a polka with off-beat accordion once working.
   finland: {
-    bpm: 76, beats: 4, sub: 2, root: 50, scale: SCALES.dorian, chords: [0, 3, 6, 0, 0, 3, 4, 0],
+    bpm: 80, workBpm: 112, beats: 4, sub: 2, root: 50, scale: SCALES.dorian, chords: [0, 3, 6, 0, 0, 3, 4, 0],
     bed: { inst: 'strings', oct: 0, vel: 0.75 },
     lead: { inst: 'harp', oct: 1, vel: 0.9, lens: [2, 2, 1, 1, 2, 4, 6], rest: 0.1 },
+    fill: 'snare',
     work: [
-      { inst: 'bass', at: [0, 2, 4, 6], pick: [0, 2, 1, 2], oct: -1, vel: 0.9 },
-      { inst: 'accordion', at: [2, 6], pick: ['chord'], oct: 0, vel: 0.45, len: 1 },
-      { inst: 'tick', at: [0, 2, 4, 6], vel: [0.6, 0.4] },
+      { inst: 'bass', at: [0, 2, 4, 6], pick: [0, 2, 0, 2], oct: -1, vel: 0.9 },
+      { inst: 'accordion', at: [1, 3, 5, 7], pick: ['chord'], oct: 0, vel: 0.45, len: 1 },
+      { inst: 'drum', at: [0, 4], vel: 0.5 },
+      { inst: 'tick', at: [1, 3, 5, 7], vel: 0.6 },
     ],
   },
-  // Florida: steel drum and marimba, a light shaker when working.
+  // Florida: steel drum and marimba; a calypso groove once working.
   florida: {
-    bpm: 94, beats: 4, sub: 2, root: 48, scale: SCALES.major, chords: [0, 3, 0, 4, 0, 3, 4, 0],
+    bpm: 96, workBpm: 116, beats: 4, sub: 2, root: 48, scale: SCALES.major, chords: [0, 3, 0, 4, 0, 3, 4, 0],
     bed: { inst: 'pad', oct: 0, vel: 0.8 },
     lead: { inst: 'steel', oct: 1, vel: 0.9, lens: [1, 2, 1, 2, 2, 1, 3, 4], rest: 0.15 },
+    fill: 'snare',
     work: [
-      { inst: 'marimba', at: [0, 3, 4, 6], pick: [0, 2, 1, 2], oct: 1, vel: 0.8 },
-      { inst: 'bass', at: [0, 3, 4], pick: [0, 0, 2], oct: -1, vel: 1 },
+      { inst: 'marimba', at: [0, 2, 3, 5, 6], pick: [0, 2, 1, 2, 3], oct: 1, vel: 0.8 },
+      { inst: 'bass', at: [0, 3, 4, 7], pick: [0, 0, 2, 1], oct: -1, vel: 1 },
+      { inst: 'drum', at: [0, 3, 6], vel: [0.6, 0.45, 0.45] },
+      { inst: 'snare', at: [4], vel: 0.4 },
       { inst: 'tick', at: [0, 1, 2, 3, 4, 5, 6, 7], vel: [0.9, 0.4] },
     ],
   },
-  // Japan: a breathy shakuhachi-like flute in the yo pentatonic over soft strings; koto and taiko when working.
+  // Japan: a breathy shakuhachi-like flute in the yo pentatonic over soft strings; koto and driving taiko once working.
   japan: {
-    bpm: 64, beats: 4, sub: 2, root: 50, scale: SCALES.yo, chords: [0, 3, 1, 3, 0, 3, 4, 0],
+    bpm: 66, workBpm: 88, beats: 4, sub: 2, root: 50, scale: SCALES.yo, chords: [0, 3, 1, 3, 0, 3, 4, 0],
     bed: { inst: 'strings', oct: 0, vel: 0.6 },
     lead: { inst: 'flute', oct: 1, vel: 0.9, lens: [4, 2, 2, 6, 1, 1, 8], rest: 0.2 },
+    fill: 'drum',
     work: [
-      { inst: 'pluck', at: [0, 2, 3, 5, 6], pick: [0, 1, 2, 3, 1], oct: 0, vel: 0.5, len: 2 },
-      { inst: 'drum', at: [0, 6], vel: [0.9, 0.5] },
-      { inst: 'bass', at: [0], pick: [0], oct: -1, vel: 0.7 },
+      { inst: 'pluck', at: [0, 1, 2, 3, 5, 6], pick: [0, 1, 2, 3, 2, 1], oct: 0, vel: 0.5, len: 2 },
+      { inst: 'drum', at: [0, 3, 4, 6, 7], vel: [1, 0.5, 0.8, 0.5, 0.6] },
+      { inst: 'tick', at: [2, 6], vel: 0.7 },
+      { inst: 'bass', at: [0, 4], pick: [0, 0], oct: -1, vel: 0.7 },
     ],
   },
-  // Italy: a tarantella in A minor, mandolin tremolo over strings; guitar and tambourine once working.
+  // Italy: a tarantella in A minor, mandolin tremolo over strings; a fast one with guitar and tambourine once working.
   italy: {
-    bpm: 100, beats: 2, sub: 3, root: 57, scale: SCALES.harmonicMinor, chords: [0, 4, 0, 3, 0, 4, 4, 0],
+    bpm: 100, workBpm: 126, beats: 2, sub: 3, root: 57, scale: SCALES.harmonicMinor, chords: [0, 4, 0, 3, 0, 4, 4, 0],
     bed: { inst: 'strings', oct: 0, vel: 0.7 },
     lead: { inst: 'balalaika', oct: 1, vel: 0.8, lens: [1, 1, 1, 2, 1, 3, 6], rest: 0.08 },
+    fill: 'tick',
     work: [
       { inst: 'bass', at: [0, 3], pick: [0, 2], oct: -1, vel: 1 },
       { inst: 'guitar', at: [1, 2, 4, 5], pick: ['chord'], oct: 0, vel: 0.35, len: 1 },
+      { inst: 'drum', at: [0, 3], vel: [0.5, 0.35] },
       { inst: 'tick', at: [0, 1, 2, 3, 4, 5], vel: [1, 0.4, 0.6, 0.9, 0.4, 0.6] },
     ],
   },
-  // Austria: a Tyrolean Ländler in G on zither over alphorn chords; oom-pah-pah when working.
+  // Austria: a Tyrolean Ländler in G on zither over alphorn chords; a quick oom-pah-pah once working.
   austria: {
-    bpm: 100, beats: 3, sub: 2, root: 55, scale: SCALES.major, chords: [0, 4, 4, 0, 0, 4, 3, 0],
+    bpm: 100, workBpm: 128, beats: 3, sub: 2, root: 55, scale: SCALES.major, chords: [0, 4, 4, 0, 0, 4, 3, 0],
     bed: { inst: 'horn', oct: -1, vel: 0.9 },
     lead: { inst: 'harp', oct: 1, vel: 0.9, lens: [1, 1, 2, 2, 1, 1, 4, 6], rest: 0.08 },
+    fill: 'snare',
     work: [
-      { inst: 'bass', at: [0], pick: [0], oct: -1, vel: 1 },
+      { inst: 'bass', at: [0, 3], pick: [0, 2], oct: -1, vel: [1, 0.7] },
       { inst: 'pluck', at: [2, 4], pick: ['chord'], oct: 0, vel: 0.4, len: 1 },
-      { inst: 'tick', at: [2, 4], vel: 0.5 },
+      { inst: 'accordion', at: [1, 5], pick: [3, 2], oct: 1, vel: 0.3, len: 1 },
+      { inst: 'tick', at: [2, 4], vel: 0.6 },
     ],
   },
 };

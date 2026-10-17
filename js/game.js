@@ -66,9 +66,16 @@ class Game {
       sheepAt = { x: c.post.x + dx * 18, y: c.post.y + dy * 18 };
       dogAt = { x: c.post.x + dx * 2, y: c.post.y + dy * 2 };
     }
-    for (let i = 0; i < map.sheepCount; i++) {
-      const a = Math.random() * Math.PI * 2, r = Math.random() * 3;
-      this.sheep.push(new Sheep(i, sheepAt.x + Math.cos(a) * r, sheepAt.y + Math.sin(a) * r, map.sheep));
+    // Pasture sets out a second mob in open ground well away from the first. A bigger mob is set out over a
+    // wider patch so the sheep don't start piled on one another.
+    const pasture = this.mode === 'pasture';
+    const mobs = pasture ? [sheepAt, this.pastureSpot([sheepAt, c.post, c.pen.mouth])] : [sheepAt];
+    const count = pasture ? PASTURE_SHEEP : map.sheepCount, spread = 3 * Math.sqrt(count / 5);
+    for (const at of mobs) for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * spread;
+      const s = new Sheep(this.sheep.length, at.x + Math.cos(a) * r, at.y + Math.sin(a) * r, map.sheep);
+      if (pasture) { s.temper.flocking *= PASTURE_LOOSE.flocking; s.space = PASTURE_LOOSE.space; }
+      this.sheep.push(s);
     }
     this.dog = new Dog(dogAt.x, dogAt.y);
     if (this.mode === 'pen') {
@@ -84,6 +91,30 @@ class Game {
 
     const cam = this.renderer.cam;
     cam.x = this.dog.x; cam.y = this.dog.y;
+  }
+
+  // The open spot furthest from the given points, clear of trees and hurdles, for pasture's second mob.
+  pastureSpot(avoid) {
+    const c = this.course, b = c.bounds, m = 20;
+    let best = null, bestD = -1;
+    for (let i = 0; i < 300; i++) {
+      const x = M.rand(b.x + m, b.x + b.w - m), y = M.rand(b.y + m, b.y + b.h - m);
+      if (c.circles.some(o => Math.hypot(x - o.x, y - o.y) < o.r + 12)) continue;
+      if (c.staticWalls.some(s => M.distToSeg(x, y, s.ax, s.ay, s.bx, s.by) < 12)) continue;
+      const d = Math.min(...avoid.map(p => Math.hypot(x - p.x, y - p.y)));
+      if (d > bestD) { bestD = d; best = { x, y }; }
+    }
+    return best || c.start;
+  }
+
+  // The sheep the dog is working: the whole flock, or in pasture the mob nearest the dog
+  // (each sheep then flocks with its own mob rather than with every sheep on the field).
+  computeFlock() {
+    if (this.mode !== 'pasture' || this.inMenu) return computeFlock(this.sheep);
+    groupFlocks(this.sheep, 10);
+    let near = null, nd = Infinity;
+    for (const s of this.sheep) { const d = Math.hypot(s.x - this.dog.x, s.y - this.dog.y); if (d < nd) { nd = d; near = s; } }
+    return near ? near.group : computeFlock([]);
   }
 
   // Dog faces the sheep at the start of a drill.
@@ -133,6 +164,8 @@ class Game {
     if (this.trial.result) return;
     this.dog.setCommand(cmd, this.flock);
     Sound.whistle(cmd);
+    this.lastWhistle = { cmd, steady: this.dog.steady, t: performance.now() };
+    this.ui.pulseCommand(cmd);
     if (WHISTLES[cmd]) Music.duck();
     if (cmd !== 'STOP' && cmd !== 'STEADY') this.trial.start();
   }
@@ -141,7 +174,7 @@ class Game {
   resume() { if (this.inMenu) return; this.paused = false; this.ui.showCard(null); this.last = performance.now(); }
   restart() { this.setup(); this.paused = false; this.ui.showCard(null); this.last = performance.now(); }
   retire() {
-    if (this.trial && !this.trial.result && this.trial.started && !this.drill) { this.trial.finish('RETIRED'); this.paused = true; this.ui.showResult(this.trial, this); return; }
+    if (this.trial && !this.trial.result && this.trial.started && !this.drill && !this.trial.pasture) { this.trial.finish('RETIRED'); this.paused = true; this.ui.showResult(this.trial, this); return; }
     this.toMenu();
   }
   toMenu() { this.inMenu = true; this.paused = true; this.enterAttract(); this.ui.showCard('menu'); }
@@ -258,7 +291,7 @@ class Game {
     else if (this.dog.command === 'DIRECT') this.dog.setDirect(0, 0);
 
     if (c.wind) c.wind.update(dt);
-    this.flock = computeFlock(this.sheep);
+    this.flock = this.computeFlock();
     const w = {
       dog: this.dog, handler: this.handler, sheep: this.sheep, flock: this.flock,
       walls: c.walls(), circles: c.circles, bounds: c.bounds, ground: c.ground, wind: c.wind, events: this.events = [],

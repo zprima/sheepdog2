@@ -6,7 +6,7 @@ const SHEEP_CFG = {
   alertR: 28,       // dog this close: sheep lift their heads
   panicR: 4.0,      // dog this close: sheep bolt and scatter
   neighborR: 16,    // flock mates considered for cohesion/alignment
-  sepR: 1.8,        // personal space
+  sepR: 1.3,        // personal space (grazing; it shrinks when they're worried)
   handlerR: 8,      // sheep keep away from the handler
   turnRate: 5.5,    // how quickly velocity follows the desired velocity
   radius: 0.55,
@@ -32,6 +32,16 @@ function sheepTemperamentWord(raw) {
   return lively >= 1.12 ? 'Flighty' : lively >= 1.05 ? 'Lively' : lively > 0.97 ? 'Steady' : lively >= 0.92 ? 'Calm' : 'Placid';
 }
 
+// Fleece colour, picked once per sheep. Most are clean cream-white; the rest are only a shade off it:
+// yellowed, a little brownish or grubby with mud.
+function fleeceColour() {
+  const r = Math.random(), hsl = (h, s, l) => `hsl(${M.rand(...h).toFixed(0)}, ${M.rand(...s).toFixed(0)}%, ${M.rand(...l).toFixed(0)}%)`;
+  if (r < 0.7) return hsl([38, 46], [28, 48], [87, 92]);    // clean
+  if (r < 0.82) return hsl([45, 50], [45, 58], [80, 85]);   // yellowed
+  if (r < 0.92) return hsl([30, 37], [22, 32], [76, 81]);   // brownish
+  return hsl([38, 46], [12, 20], [72, 77]);                 // muddy
+}
+
 class Sheep {
   constructor(id, x, y, temperament) {
     this.id = id;
@@ -41,13 +51,17 @@ class Sheep {
     this.state = 'GRAZE';
     this.pressure = 0;
     this.panic = 0;
+    this.unease = 0;       // lingers after the dog has worked them: uneasy sheep stay bunched
     this.wanderDir = this.heading;
     this.wanderT = M.rand(1, 3);
     this.grazing = true;
     this.stepPhase = Math.random() * 10;
     this.penned = false;   // locked in behind a closed gate
     this.inPen = false;    // currently standing inside the pen
-    this.tint = Math.random();
+    this.fleece = fleeceColour();
+    this.stride = M.rand(0.92, 1.08); // some sheep are a touch quicker on the run, so a driven mob has depth
+    this.space = 1;        // personal-space multiplier (looser in pasture)
+    this.group = null;     // this sheep's own mob when the field holds more than one (see groupFlocks)
   }
 
   // 0..1 how threatened this sheep feels by the dog.
@@ -70,8 +84,17 @@ class Sheep {
     const trot = c.trot * t.pace, run = c.run * t.pace, panicRun = c.panicRun * t.pace;
     const dog = w.dog;
     const { d, dx, dy, pressure } = this.computePressure(dog);
-    const target = this.penned ? 0 : pressure;
+    // Alarm spreads through the flock: a sheep feels some of what its mates feel, so they react as one
+    // rather than one lifting its head while the rest graze on.
+    let mateP = 0, mates = 0;
+    for (const o of w.sheep) {
+      if (o === this || o.penned !== this.penned) continue;
+      if (Math.hypot(o.x - this.x, o.y - this.y) < c.neighborR) { mateP += o.pressure; mates++; }
+    }
+    if (mates) mateP /= mates;
+    const target = this.penned ? 0 : Math.max(pressure, mateP * 0.7);
     this.pressure += (target - this.pressure) * Math.min(1, dt * 6);
+    this.unease = this.penned ? 0 : Math.max(this.pressure, this.unease - dt / 8);
 
     if (!this.penned && d < c.panicR * t.wary + 0.8) {
       if (this.panic < 0.3) w.events.push({ type: 'panic', sheep: this });
@@ -80,7 +103,7 @@ class Sheep {
     this.panic = Math.max(0, this.panic - dt / 1.6);
 
     // Flock mates. Personal space shrinks as the dog presses: worried sheep pack in shoulder to shoulder.
-    const sepRange = c.sepR * 2 * (1 - 0.4 * this.pressure);
+    const sp = this.space, sepRange = c.sepR * 2 * sp * (1 - 0.35 * this.unease);
     let cx = 0, cy = 0, avx = 0, avy = 0, n = 0, sx = 0, sy = 0, nearest = Infinity;
     for (const o of w.sheep) {
       if (o === this || o.penned !== this.penned) continue;
@@ -94,15 +117,17 @@ class Sheep {
       }
     }
     if (n) { cx /= n; cy /= n; avx /= n; avy /= n; }
-    const flock = w.flock;
+    const flock = this.group || w.flock;
     const dc = flock.n ? Math.hypot(flock.x - this.x, flock.y - this.y) : 0;
+    // Distances from the mob's centre scale with its size (and spacing): a big mob is naturally wider.
+    const fs = sp * Math.sqrt(Math.max(1, flock.n / 5));
 
     // State transitions (with a little hysteresis).
     const p = this.pressure;
     if (this.penned) this.state = 'PENNED';
     else if (this.state === 'FLEE' ? p > 0.12 : p > 0.2) this.state = 'FLEE';
     else if (this.state === 'ALERT' ? p > 0.03 : p > 0.06) this.state = 'ALERT';
-    else if (flock.n > 1 && (this.state === 'REGROUP' ? dc > 5 : dc > 9)) this.state = 'REGROUP';
+    else if (flock.n > 1 && (this.state === 'REGROUP' ? dc > 3.5 * fs : dc > 7 * fs)) this.state = 'REGROUP';
     else this.state = 'GRAZE';
 
     let desX = 0, desY = 0;
@@ -112,9 +137,9 @@ class Sheep {
     const dcn = n ? Math.hypot(cx - this.x, cy - this.y) : dc;
     // Flock mentality: a sheep away from the mob wants back in, even while watching the dog.
     const [fx, fy] = flock.n > 1 ? M.norm(flock.x - this.x, flock.y - this.y) : [0, 0];
-    const regroup = flock.n > 1 ? M.clamp((dc - 6) / 8, 0, 1) * t.flocking : 0;
-    // Grazing sheep keep a mate within a few metres; a sheep that finds itself alone walks back.
-    const lonely = n ? M.clamp((nearest - 2.5) / 3, 0, 1) * t.flocking : 0;
+    const regroup = flock.n > 1 ? M.clamp((dc - 4 * fs) / (6 * fs), 0, 1) * t.flocking : 0;
+    // Grazing sheep keep a mate close by (closer still while uneasy); one that finds itself alone walks back.
+    const lonely = n ? M.clamp((nearest - (2.2 - this.unease) * sp) / 2, 0, 1) * t.flocking : 0;
 
     switch (this.state) {
       case 'GRAZE': {
@@ -124,12 +149,13 @@ class Sheep {
           this.grazing = Math.random() < 0.6;
           // Pick the next bite in roughly the direction the rest are, more so the further out it is.
           let dir = this.heading + M.rand(-1.4, 1.4);
-          if (flock.n > 1 && dc > 2) dir = M.angleLerp(dir, Math.atan2(flock.y - this.y, flock.x - this.x), M.clamp((dc - 2) / 5, 0, 0.8));
+          if (flock.n > 1 && dc > 1.5 * fs) dir = M.angleLerp(dir, Math.atan2(flock.y - this.y, flock.x - this.x), M.clamp((dc - 1.5 * fs) / (3.5 * fs), 0, 0.85));
           this.wanderDir = dir;
         }
-        if (!this.grazing) { desX = Math.cos(this.wanderDir) * c.walk; desY = Math.sin(this.wanderDir) * c.walk; }
+        // Uneasy sheep don't wander off for a bite; they stand with the others.
+        if (!this.grazing) { const k = c.walk * (1 - 0.7 * this.unease); desX = Math.cos(this.wanderDir) * k; desY = Math.sin(this.wanderDir) * k; }
         if (lonely > 0) { desX += tcx * c.walk * lonely; desY += tcy * c.walk * lonely; }
-        if (flock.n > 1 && dc > 5) { const k = c.walk * 0.8 * M.clamp((dc - 5) / 4, 0, 1) * t.flocking; desX += fx * k; desY += fy * k; }
+        if (flock.n > 1 && dc > 3 * fs) { const k = c.walk * M.clamp((dc - 3 * fs) / (3 * fs), 0, 1) * t.flocking; desX += fx * k; desY += fy * k; }
         desX += sx * c.walk; desY += sy * c.walk;
         break;
       }
@@ -141,14 +167,17 @@ class Sheep {
       case 'ALERT': {
         const drift = c.walk * 0.7 * M.clamp((p - 0.08) / 0.12, 0, 1);
         // Heads up, they close ranks: each sheep edges in toward its mates.
-        const bunch = c.walk * M.clamp(p / 0.15, 0.4, 1) * M.clamp((dcn - 1.2) / 2.5, 0, 1) * t.flocking;
+        const bunch = c.walk * M.clamp(p / 0.15, 0.4, 1) * M.clamp((dcn - 1.2 * sp) / 2.5, 0, 1) * t.flocking;
         desX = ux * drift + tcx * bunch + sx * c.walk * 0.7 + fx * regroup * trot;
         desY = uy * drift + tcy * bunch + sy * c.walk * 0.7 + fy * regroup * trot;
         break;
       }
       case 'FLEE': {
-        const q = M.clamp((p - 0.15) / 0.85, 0, 1);
-        let speed = M.lerp(c.walk, run, Math.pow(q, 1.2));
+        // Pace is set by the mob, not by each sheep's own distance to the dog: otherwise the ones at the
+        // back run faster, draw level with the front and the flock flattens into a line abreast.
+        const pq = M.lerp(p, Math.max(p * 0.6, mateP), 0.65 * Math.min(1, t.flocking));
+        const q = M.clamp((pq - 0.15) / 0.85, 0, 1);
+        let speed = M.lerp(c.walk, run, Math.pow(q, 1.2)) * this.stride;
         if (this.panic > 0) speed = Math.max(speed, panicRun * this.panic);
         // Run away from the dog as a mob, not each sheep straight out from it: blend this sheep's own
         // escape line with the flock's (centre away from dog), so the edges don't fan out. A sheep the
@@ -157,11 +186,23 @@ class Sheep {
         const share = 0.55 * t.flocking * (1 - this.panic * 0.5) * M.clamp((d - 2) / 6, 0.3, 1);
         const [ex, ey] = M.norm(ux * (1 - share) + gx * share, uy * (1 - share) + gy * share);
         // Blend flight with flock cohesion and alignment: threatened sheep bunch up and move as one.
-        const wC = (0.7 + 0.5 * (1 - p)) * M.clamp((dcn - 1) / 3, 0, 1) * (1 - this.panic * 0.5) * t.flocking;
+        const wC = (0.7 + 0.5 * (1 - p)) * M.clamp((dcn - 0.6 * sp) / 2.4, 0, 1) * (1 - this.panic * 0.5) * t.flocking;
         const [alx, aly] = M.norm(avx, avy);
         const wA = 0.55 * t.flocking;
-        let bx = ex + tcx * wC + alx * wA + sx * 1.2 + fx * regroup;
-        let by = ey + tcy * wC + aly * wA + sy * 1.2 + fy * regroup;
+        // Squeeze in from the flanks: a sheep out to the side of the mob's line of travel angles back in,
+        // so a driven flock runs as a tight bunch or a short column rather than spread across the field.
+        let lx = 0, ly = 0;
+        if (flock.n > 1) {
+          const px = -ey, py = ex;
+          const lat = (flock.x - this.x) * px + (flock.y - this.y) * py;
+          const k = Math.sign(lat) * M.clamp((Math.abs(lat) - 0.5 * fs) / 1.6, 0, 1) * 1.1 * t.flocking * (1 - this.panic * 0.6);
+          lx = px * k; ly = py * k;
+          // ...and front to back: leaders ease off, stragglers press on, so the bunch doesn't string out.
+          const lon = (this.x - flock.x) * ex + (this.y - flock.y) * ey;
+          speed *= 1 - M.clamp((Math.abs(lon) - fs) / 5, 0, 0.3) * Math.sign(lon) * t.flocking;
+        }
+        let bx = ex + tcx * wC + alx * wA + sx * 1.2 + fx * regroup + lx;
+        let by = ey + tcy * wC + aly * wA + sy * 1.2 + fy * regroup + ly;
         // Handler pressure.
         const hx = this.x - w.handler.x, hy = this.y - w.handler.y, hd = Math.hypot(hx, hy);
         if (hd < c.handlerR && hd > 1e-6) { const f = (1 - hd / c.handlerR) * 1.4; bx += hx / hd * f; by += hy / hd * f; }
@@ -218,4 +259,24 @@ function computeFlock(sheep) {
     maxSpeed = Math.max(maxSpeed, Math.hypot(s.vx, s.vy));
   }
   return { x, y, n, spread, maxSpeed };
+}
+
+// Split the sheep into separate mobs (any two within `link` metres share one) and give each sheep its mob's
+// centre, size, spread and top speed as .group.
+function groupFlocks(sheep, link) {
+  const seen = new Set(), l2 = link * link;
+  for (const s of sheep) {
+    if (seen.has(s)) continue;
+    const mob = [s]; seen.add(s);
+    for (let i = 0; i < mob.length; i++) {
+      const a = mob[i];
+      for (const o of sheep) {
+        if (seen.has(o)) continue;
+        const dx = o.x - a.x, dy = o.y - a.y;
+        if (dx * dx + dy * dy < l2) { seen.add(o); mob.push(o); }
+      }
+    }
+    const f = computeFlock(mob);
+    for (const o of mob) o.group = f;
+  }
 }
