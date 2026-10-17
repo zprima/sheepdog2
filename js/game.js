@@ -262,11 +262,13 @@ class Game {
   }
   zoomBy(f) { const cam = this.renderer.cam; cam.zoom = M.clamp(cam.zoom * f, 7, 34); }
 
-  // Shortest time between frames (ms): full rate in play, 30 fps on the title screens and on phones,
+  // Shortest time between frames (ms): full rate in play (60 fps on phones, so 120 Hz screens don't
+  // drain the battery; 30 fps there makes moving sheep judder into a blur), 30 fps on the title screens,
   // and only enough to keep the music and HUD ticking while paused (the field is not redrawn then).
   frameGap() {
     if (this.paused && !this.inMenu) return 100;
-    return this.inMenu || TOUCH_DEVICE ? 1000 / 30 : 0;
+    if (this.inMenu) return 1000 / 30;
+    return TOUCH_DEVICE ? 1000 / 60 : 0;
   }
 
   frame(now) {

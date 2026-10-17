@@ -35,25 +35,6 @@ class Minimap {
     ctx.fillStyle = '#4ea0ff'; ctx.beginPath(); ctx.arc(game.handler.x, game.handler.y, 1.8, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(game.dog.x, game.dog.y, 2.2, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8; ctx.stroke();
-    if (c.wind) this.drawWind(c.wind, dpr);
-  }
-
-  // Wind gauge in the top-left corner: an arrow pointing downwind, longer in the gusts, and the speed.
-  drawWind(wind, dpr) {
-    const ctx = this.ctx, x = 17, y = 17;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.translate(x, y); ctx.rotate(wind.angle);
-    const L = 5 + wind.strength * 5;
-    ctx.strokeStyle = ctx.fillStyle = '#f2f4f0'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(L - 2, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(L + 1, 0); ctx.lineTo(L - 4, -3.5); ctx.lineTo(L - 4, 3.5); ctx.closePath(); ctx.fill();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.font = '600 10px system-ui, sans-serif'; ctx.textBaseline = 'middle';
-    const label = `${Math.round(wind.speed)} m/s`;
-    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 15, y - 7, ctx.measureText(label).width + 8, 14);
-    ctx.fillStyle = '#f2f4f0'; ctx.fillText(label, x + 19, y);
   }
 }
 
