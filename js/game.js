@@ -262,7 +262,16 @@ class Game {
   }
   zoomBy(f) { const cam = this.renderer.cam; cam.zoom = M.clamp(cam.zoom * f, 7, 34); }
 
+  // Shortest time between frames (ms): full rate in play, 30 fps on the title screens and on phones,
+  // and only enough to keep the music and HUD ticking while paused (the field is not redrawn then).
+  frameGap() {
+    if (this.paused && !this.inMenu) return 100;
+    return this.inMenu || TOUCH_DEVICE ? 1000 / 30 : 0;
+  }
+
   frame(now) {
+    // A little slack so a 60 Hz display reliably lands on every other frame.
+    if (now - this.last < this.frameGap() - 4) { requestAnimationFrame((t) => this.frame(t)); return; }
     let dt = (now - this.last) / 1000;
     this.last = now;
     dt = Math.min(dt, 0.1);
@@ -273,8 +282,12 @@ class Game {
       for (let i = 0; i < steps; i++) this.update(h);
     }
     if (this.course) {
-      this.renderer.draw(this);
-      this.minimap.draw(this);
+      // A paused field is a still picture: draw it only when something (a resize) asks for it.
+      if (!(this.paused && !this.inMenu) || this.renderer.dirty) {
+        this.renderer.draw(this);
+        this.minimap.draw(this);
+        this.renderer.dirty = false;
+      }
       this.ui.update(dt);
       if (this.dog) this.ui.updateCommands(this.dog);
       const wind = this.course.wind;

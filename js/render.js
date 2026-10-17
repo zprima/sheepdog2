@@ -29,6 +29,9 @@ class Camera {
   }
 }
 
+// Phones and tablets: render at a lower pixel ratio and frame rate to save battery.
+const TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches;
+
 // Big landmark buildings: depth-sorted from their footprint centre, with a broad ground shadow.
 const LANDMARKS = new Set(['barn', 'windmill', 'stones', 'castle', 'flagpole', 'lighthouse', 'chapel', 'temple']);
 
@@ -51,7 +54,8 @@ class Renderer {
   }
 
   resize() {
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(TOUCH_DEVICE ? 1.5 : 2, window.devicePixelRatio || 1);
+    this.dirty = true;
     this.cam.w = window.innerWidth; this.cam.h = window.innerHeight;
     this.canvas.width = Math.floor(this.cam.w * this.dpr);
     this.canvas.height = Math.floor(this.cam.h * this.dpr);

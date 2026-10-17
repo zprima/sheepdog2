@@ -467,3 +467,8 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   .fs-back, .map-start { padding-top: 8px; padding-bottom: 8px; }
   .map-start { flex: 0 1 auto; padding-left: 32px; padding-right: 32px; }
 }
+
+/* Touch devices: no live blur behind panels and cards, it costs the GPU every frame. */
+@media (pointer: coarse) {
+  .panel, #overlay.run { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
