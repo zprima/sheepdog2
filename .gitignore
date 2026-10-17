@@ -1,7 +1,5 @@
 .claude
-
 trailer/*
-
 serve.py
-
-README.md.DS_Store
+README.md
+.DS_Store
